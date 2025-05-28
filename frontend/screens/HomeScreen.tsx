@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '../components/ui/Button';
+import { colors, spacing, typography } from '../constants/theme';
 
 export const HomeScreen: React.FC = () => {
   return (
@@ -28,26 +29,27 @@ export const HomeScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    padding: spacing.lg,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    fontSize: typography.fontSizes.xxxl,
+    fontWeight: typography.fontWeights.bold,
+    color: colors.text,
+    marginBottom: spacing.sm,
   },
   subtitle: {
-    fontSize: 18,
-    color: '#666',
-    marginBottom: 40,
+    fontSize: typography.fontSizes.lg,
+    color: colors.textLight,
+    marginBottom: spacing.xxl,
   },
   buttonContainer: {
     width: '100%',
     maxWidth: 300,
   },
   button: {
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
 }); 

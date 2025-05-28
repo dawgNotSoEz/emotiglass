@@ -1,20 +1,15 @@
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView, StyleSheet } from 'react-native';
-import { HomeScreen } from './screens/HomeScreen';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AppNavigator } from './navigation/AppNavigator';
+import 'react-native-gesture-handler';
+import 'react-a'
 
 export default function App() {
   return (
-    <SafeAreaView style={styles.container}>
-      <HomeScreen />
+    <SafeAreaProvider>
+      <AppNavigator />
       <StatusBar style="auto" />
-    </SafeAreaView>
+    </SafeAreaProvider>
   );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-}); 
+} 
