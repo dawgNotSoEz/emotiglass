@@ -1,0 +1,17 @@
+# These owners will be the default owners for everything in the repo
+* @dawgnotsoez
+
+# Frontend code
+/frontend/   @dawgnotsoez
+
+# Backend code
+/backend/    @dawgnotsoez
+
+# AI models
+/ai-models/  @dawgnotsoez
+
+# Documentation
+/docs/       @dawgnotsoez
+
+# Scripts
+/scripts/    @dawgnotsoez 
