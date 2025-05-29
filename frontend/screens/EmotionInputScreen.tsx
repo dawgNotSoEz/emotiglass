@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   StyleSheet, 
   View, 
@@ -14,14 +14,95 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../constants/theme';
 import { EmotionSlider } from '../components/ui/EmotionSlider';
-import { DrawingCanvas } from '../components/ui/DrawingCanvas';
-import { VoiceRecorder } from '../components/ui/VoiceRecorder';
-import { FaceCamera } from '../components/ui/FaceCamera';
-import { analyzeEmotions } from '../services/emotionAnalysis';
-import { EmotionData, EmotionAnalysisResult, RootStackParamList } from '../types';
-import { FaceAnalysisResult, integrateEmotionData } from '../services/faceAnalysis';
+import { EmotionData, RootStackParamList } from '../types';
+import { generateRandomEmotionData } from '../services/dummyData';
 
 type EmotionInputScreenNavigationProp = StackNavigationProp<RootStackParamList, 'EmotionInput'>;
+
+// Placeholder components for prototype
+const DrawingCanvas: React.FC<{ onDrawingComplete: (data: string) => void }> = ({ onDrawingComplete }) => {
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+      <Text style={{ color: theme.colors.textLight }}>Drawing Canvas Placeholder</Text>
+      <TouchableOpacity
+        style={{
+          marginTop: 20,
+          backgroundColor: theme.colors.primary,
+          padding: 10,
+          borderRadius: 8
+        }}
+        onPress={() => onDrawingComplete('dummy-drawing-data')}
+      >
+        <Text style={{ color: 'white' }}>Generate Random Drawing</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+const VoiceRecorder: React.FC<{ onRecordingComplete: (uri: string) => void }> = ({ onRecordingComplete }) => {
+  const [isRecording, setIsRecording] = useState(false);
+  
+  const toggleRecording = () => {
+    setIsRecording(!isRecording);
+    if (isRecording) {
+      onRecordingComplete('dummy-voice-recording');
+    }
+  };
+  
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+      <Text style={{ color: theme.colors.textLight, marginBottom: 20 }}>Voice Recorder Placeholder</Text>
+      <TouchableOpacity
+        style={{
+          width: 80,
+          height: 80,
+          borderRadius: 40,
+          backgroundColor: isRecording ? theme.colors.error : theme.colors.primary,
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+        onPress={toggleRecording}
+      >
+        <Ionicons name={isRecording ? 'stop' : 'mic'} size={40} color="white" />
+      </TouchableOpacity>
+      <Text style={{ marginTop: 20, color: theme.colors.text }}>
+        {isRecording ? 'Recording...' : 'Tap to start recording'}
+      </Text>
+    </View>
+  );
+};
+
+const FaceCamera: React.FC<{ onEmotionDetected: (result: any) => void }> = ({ onEmotionDetected }) => {
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+      <Text style={{ color: theme.colors.textLight }}>Face Camera Placeholder</Text>
+      <TouchableOpacity
+        style={{
+          marginTop: 20,
+          backgroundColor: theme.colors.primary,
+          padding: 10,
+          borderRadius: 8
+        }}
+        onPress={() => onEmotionDetected({
+          faceDetected: true,
+          dominantEmotion: 'joy',
+          emotionScores: {
+            joy: 0.8,
+            sadness: 0.1,
+            anger: 0.05,
+            fear: 0.02,
+            surprise: 0.1,
+            disgust: 0.03,
+            contentment: 0.5,
+            neutral: 0.2
+          }
+        })}
+      >
+        <Text style={{ color: 'white' }}>Simulate Face Detection</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
 
 export const EmotionInputScreen: React.FC = () => {
   const navigation = useNavigation<EmotionInputScreenNavigationProp>();
@@ -39,7 +120,7 @@ export const EmotionInputScreen: React.FC = () => {
     calmness: 50,
     tension: 50
   });
-  const [faceAnalysis, setFaceAnalysis] = useState<FaceAnalysisResult | null>(null);
+  const [faceAnalysis, setFaceAnalysis] = useState<any | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   
   // Update emotion data from sliders
@@ -52,27 +133,38 @@ export const EmotionInputScreen: React.FC = () => {
   
   // Update emotion data from drawing
   const handleDrawingComplete = (drawingData: string) => {
+    // For prototype, generate random emotion data
+    const randomData = generateRandomEmotionData();
     setEmotionData(prev => ({
       ...prev,
-      drawing: drawingData,
+      ...randomData
     }));
   };
   
   // Update emotion data from voice recording
   const handleVoiceRecorded = (uri: string) => {
+    // For prototype, generate random emotion data
+    const randomData = generateRandomEmotionData();
     setEmotionData(prev => ({
       ...prev,
-      voiceNote: uri,
+      ...randomData
     }));
   };
   
   // Handle face emotion detection
-  const handleFaceEmotionDetected = (result: FaceAnalysisResult) => {
+  const handleFaceEmotionDetected = (result: any) => {
     setFaceAnalysis(result);
     
-    // Integrate face analysis with current emotion data
-    const updatedData = integrateEmotionData(emotionData, result);
-    setEmotionData(updatedData);
+    // For prototype, use the simulated emotion scores
+    if (result.faceDetected) {
+      setEmotionData(prev => ({
+        ...prev,
+        ...result.emotionScores,
+        energy: Math.random() * 100,
+        calmness: Math.random() * 100,
+        tension: Math.random() * 100
+      }));
+    }
   };
   
   // Submit and analyze emotion data
@@ -80,17 +172,16 @@ export const EmotionInputScreen: React.FC = () => {
     setAnalyzing(true);
     
     try {
-      // Analyze emotion data
-      const analysisResult = await analyzeEmotions(emotionData);
-      
-      // Navigate to visualization screen
-      navigation.navigate('MoodVisualization', {
-        emotionData: emotionData
-      });
+      // Navigate to visualization screen after a short delay
+      setTimeout(() => {
+        navigation.navigate('MoodVisualization', {
+          emotionData: emotionData
+        });
+        setAnalyzing(false);
+      }, 1000);
     } catch (error) {
       console.error('Failed to analyze emotions:', error);
       Alert.alert('Error', 'Failed to analyze emotions. Please try again.');
-    } finally {
       setAnalyzing(false);
     }
   };
@@ -249,12 +340,12 @@ export const EmotionInputScreen: React.FC = () => {
                         <View 
                           style={[
                             styles.emotionScoreBar, 
-                            { width: `${score * 100}%` }
+                            { width: `${(score as number) * 100}%` }
                           ]} 
                         />
                       </View>
                       <Text style={styles.emotionScoreValue}>
-                        {Math.round(score * 100)}%
+                        {Math.round((score as number) * 100)}%
                       </Text>
                     </View>
                   ))}
