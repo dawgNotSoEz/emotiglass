@@ -29,6 +29,7 @@ export interface EmotionAnalysisResult {
 export interface MoodEntry {
   id: string;
   timestamp: number;
+  createdAt: number;
   date: string;
   emotions: EmotionData;
   dominantEmotion: keyof EmotionData;
