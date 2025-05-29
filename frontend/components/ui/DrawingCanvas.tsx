@@ -13,6 +13,23 @@ interface DrawingCanvasProps {
   height?: number;
 }
 
+// Set up the drawings directory
+const DRAWINGS_DIR = FileSystem.documentDirectory + 'drawings/';
+
+// Ensure directory exists
+const ensureDirectoryExists = async (directory: string): Promise<void> => {
+  try {
+    const dirInfo = await FileSystem.getInfoAsync(directory);
+    if (!dirInfo.exists) {
+      console.log(`Creating directory: ${directory}`);
+      await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+    }
+  } catch (error) {
+    console.error(`Error ensuring directory exists: ${directory}`, error);
+    // Don't throw error here, just log it
+  }
+};
+
 export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   onDrawingComplete,
   width = Dimensions.get('window').width - 32,
@@ -23,6 +40,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   const [currentColor, setCurrentColor] = useState('#000000');
   const [currentWidth, setCurrentWidth] = useState(3);
   const [previewMode, setPreviewMode] = useState(false);
+  const [directoryReady, setDirectoryReady] = useState(false);
   
   // Available colors
   const colorOptions = [
@@ -42,11 +60,32 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   
   // Available stroke widths
   const strokeWidths = [1, 2, 4, 6, 8, 12];
+  
+  // Initialize directory
+  useEffect(() => {
+    const initDirectory = async () => {
+      try {
+        await ensureDirectoryExists(DRAWINGS_DIR);
+        setDirectoryReady(true);
+      } catch (error) {
+        console.error('Failed to initialize drawing directory:', error);
+        Alert.alert(
+          'Storage Error',
+          'Unable to access storage for saving drawings. Drawing functionality may be limited.',
+          [{ text: 'OK' }]
+        );
+      }
+    };
+    
+    initDirectory();
+  }, []);
 
   // Notify parent when drawing changes
   useEffect(() => {
-    const drawingData = JSON.stringify(paths);
-    onDrawingComplete(drawingData);
+    if (paths.length > 0) {
+      const drawingData = JSON.stringify(paths);
+      onDrawingComplete(drawingData);
+    }
   }, [paths]);
   
   // Pan responder for touch handling
@@ -131,25 +170,27 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       return;
     }
     
+    if (!directoryReady) {
+      Alert.alert('Storage not ready', 'Please try again in a moment');
+      return;
+    }
+    
     try {
       // Create a unique filename
       const fileName = `drawing_${Date.now()}.json`;
-      const fileUri = `${FileSystem.documentDirectory}drawings/${fileName}`;
+      const fileUri = `${DRAWINGS_DIR}${fileName}`;
       
-      // Ensure directory exists
-      const dirUri = `${FileSystem.documentDirectory}drawings`;
-      const dirInfo = await FileSystem.getInfoAsync(dirUri);
-      if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(dirUri, { intermediates: true });
-      }
+      // Ensure directory exists again just to be safe
+      await ensureDirectoryExists(DRAWINGS_DIR);
       
       // Save the drawing data
-      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(paths));
+      const drawingData = JSON.stringify(paths);
+      await FileSystem.writeAsStringAsync(fileUri, drawingData);
       
       Alert.alert('Success', 'Drawing saved successfully');
     } catch (error) {
       console.error('Error saving drawing:', error);
-      Alert.alert('Error', 'Failed to save drawing');
+      Alert.alert('Error', 'Failed to save drawing. Please try again.');
     }
   };
   
@@ -244,6 +285,12 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
             >
               <Text style={styles.exitPreviewText}>Exit Preview</Text>
             </TouchableOpacity>
+          </View>
+        )}
+        
+        {!directoryReady && (
+          <View style={styles.initializingOverlay}>
+            <Text style={styles.initializingText}>Initializing drawing tools...</Text>
           </View>
         )}
       </View>
@@ -424,6 +471,17 @@ const styles = StyleSheet.create({
   exitPreviewText: {
     color: '#fff',
     fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+  },
+  initializingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  initializingText: {
+    color: themeColors.textLight,
+    fontSize: typography.fontSizes.md,
     fontWeight: typography.fontWeights.medium,
   }
 }); 
