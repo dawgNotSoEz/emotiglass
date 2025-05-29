@@ -136,7 +136,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         if (previewMode) return;
         
         const { locationX, locationY } = event.nativeEvent;
-        console.log(`Starting drawing at: ${locationX}, ${locationY}`);
+        console.log(`Starting drawing at: ${locationX}, ${locationY} with color ${currentColor} and width ${currentWidth}`);
         setIsDrawing(true);
         
         // Start a new path
@@ -166,11 +166,11 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       onPanResponderRelease: () => {
         if (!currentPath || previewMode) return;
         
-        console.log(`Finished drawing path with ${currentPath.points.length} points`);
+        console.log(`Finished drawing path with ${currentPath.points.length} points using color ${currentPath.color}`);
         setIsDrawing(false);
         
         // Only add the path if it has more than one point
-        if (currentPath.points.length > 1) {
+        if (currentPath.points.length >= 1) {
           setPaths(prevPaths => [...prevPaths, currentPath]);
           console.log(`Added path with color ${currentPath.color} and width ${currentPath.width}`);
         } else {
@@ -257,6 +257,18 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       console.error('Error saving drawing:', error);
       Alert.alert('Error', 'Failed to save drawing. Please try again.');
     }
+  };
+  
+  // Handle color selection
+  const handleColorChange = (color: string) => {
+    console.log(`Color changed to: ${color}`);
+    setCurrentColor(color);
+  };
+
+  // Handle width selection
+  const handleWidthChange = (width: number) => {
+    console.log(`Width changed to: ${width}`);
+    setCurrentWidth(width);
   };
   
   // Create SVG path data from points
@@ -414,10 +426,14 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
                     { backgroundColor: color },
                     currentColor === color && styles.selectedColor,
                   ]}
-                  onPress={() => setCurrentColor(color)}
+                  onPress={() => handleColorChange(color)}
+                  activeOpacity={0.7}
                 />
               ))}
             </View>
+            <Text style={styles.currentSelectionText}>
+              Selected: <Text style={{color: currentColor}}>⬤</Text> ({currentColor})
+            </Text>
           </View>
           
           <View style={styles.widthPickerContainer}>
@@ -430,7 +446,8 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
                     styles.widthButton,
                     currentWidth === width && styles.selectedWidth,
                   ]}
-                  onPress={() => setCurrentWidth(width)}
+                  onPress={() => handleWidthChange(width)}
+                  activeOpacity={0.7}
                 >
                   <View
                     style={[
@@ -441,6 +458,42 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
                 </TouchableOpacity>
               ))}
             </View>
+            <Text style={styles.currentSelectionText}>Selected width: {currentWidth}px</Text>
+          </View>
+
+          <View style={styles.testDrawButtons}>
+            <TouchableOpacity 
+              style={styles.testButton} 
+              onPress={() => {
+                const testPath: DrawingPath = {
+                  points: [
+                    { x: 50, y: 50 },
+                    { x: 100, y: 100 }
+                  ],
+                  color: currentColor,
+                  width: currentWidth
+                };
+                setPaths(prev => [...prev, testPath]);
+                console.log(`Added test line with color ${currentColor} and width ${currentWidth}`);
+              }}
+            >
+              <Text style={styles.testButtonText}>Test Line</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.testButton} 
+              onPress={() => {
+                const testPath: DrawingPath = {
+                  points: [{ x: 150, y: 75 }],
+                  color: currentColor,
+                  width: currentWidth
+                };
+                setPaths(prev => [...prev, testPath]);
+                console.log(`Added test dot with color ${currentColor} and width ${currentWidth}`);
+              }}
+            >
+              <Text style={styles.testButtonText}>Test Dot</Text>
+            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -527,6 +580,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
     borderWidth: 1,
     borderColor: '#ddd',
+    elevation: 2,
   },
   selectedColor: {
     borderWidth: 3,
@@ -549,6 +603,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 4,
+    elevation: 2,
   },
   selectedWidth: {
     borderColor: themeColors.primary,
@@ -625,5 +680,27 @@ const styles = StyleSheet.create({
     color: 'rgba(0, 0, 0, 0.2)',
     fontSize: typography.fontSizes.xl,
     fontWeight: typography.fontWeights.bold,
-  }
+  },
+  currentSelectionText: {
+    marginTop: spacing.xs,
+    fontSize: typography.fontSizes.sm,
+    color: themeColors.text,
+  },
+  testDrawButtons: {
+    flexDirection: 'row',
+    marginTop: spacing.md,
+    justifyContent: 'center',
+  },
+  testButton: {
+    backgroundColor: themeColors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 4,
+    marginHorizontal: spacing.sm,
+  },
+  testButtonText: {
+    color: '#fff',
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+  },
 }); 
