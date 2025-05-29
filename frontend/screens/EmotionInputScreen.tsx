@@ -84,9 +84,14 @@ export const EmotionInputScreen: React.FC = () => {
   // Update emotion data from drawing
   const handleDrawingComplete = async (drawingData: string) => {
     // Skip if empty drawing
-    if (drawingData === '[]') return;
+    if (drawingData === '[]') {
+      console.log('Empty drawing, skipping analysis');
+      return;
+    }
     
     try {
+      console.log('Processing drawing data...');
+      
       // Save the drawing
       const uri = await saveDrawing(drawingData);
       
@@ -95,8 +100,11 @@ export const EmotionInputScreen: React.FC = () => {
         return;
       }
       
+      console.log(`Drawing saved to: ${uri}`);
+      
       // Analyze the drawing for emotional content
       const emotionResults = await analyzeDrawing(drawingData);
+      console.log('Drawing analysis complete', emotionResults);
       
       // Update the emotion data
       setEmotionData(prev => ({
