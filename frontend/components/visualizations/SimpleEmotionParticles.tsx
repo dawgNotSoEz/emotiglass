@@ -10,7 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { EmotionAnalysisResult } from '../../types';
 
-interface EmotionParticlesProps {
+interface SimpleEmotionParticlesProps {
   moodAnalysis: EmotionAnalysisResult;
   count?: number;
 }
@@ -24,7 +24,7 @@ interface Particle {
   opacity: number;
 }
 
-export const EmotionParticles: React.FC<EmotionParticlesProps> = ({ 
+export const SimpleEmotionParticles: React.FC<SimpleEmotionParticlesProps> = ({ 
   moodAnalysis, 
   count = 40 
 }) => {
