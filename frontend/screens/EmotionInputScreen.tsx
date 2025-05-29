@@ -18,8 +18,8 @@ import { EmotionSlider } from '../components/ui/EmotionSlider';
 import { DrawingCanvas } from '../components/ui/DrawingCanvas';
 import { VoiceRecorder } from '../components/ui/VoiceRecorder';
 import { FaceCamera } from '../components/ui/FaceCamera';
-import { analyzeEmotion, EmotionData, EmotionAnalysisResult } from '../services/emotionAnalysis';
-import { saveMoodEntry } from '../services/storage';
+import { analyzeEmotion } from '../services/emotionAnalysis';
+import { EmotionData, EmotionAnalysisResult } from '../types';
 import { FaceAnalysisResult, integrateEmotionData } from '../services/faceAnalysis';
 
 type EmotionInputScreenNavigationProp = StackNavigationProp<RootStackParamList, 'EmotionInput'>;
@@ -79,20 +79,9 @@ export const EmotionInputScreen: React.FC = () => {
       // Analyze emotion data
       const analysisResult = await analyzeEmotion(emotionData);
       
-      // Save mood entry
-      await saveMoodEntry({
-        id: Date.now().toString(),
-        createdAt: Date.now(),
-        emotionData,
-        analysis: analysisResult,
-      });
-      
       // Navigate to visualization screen
       navigation.navigate('MoodVisualization', {
-        emotionData: {
-          ...emotionData,
-          analysis: analysisResult,
-        },
+        emotionData: emotionData
       });
     } catch (error) {
       console.error('Failed to analyze emotions:', error);
@@ -309,7 +298,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: typography.fontSizes.lg,
-    fontWeight: typography.fontWeights.bold,
+    fontWeight: 700,
     color: colors.text,
   },
   tabContainer: {
@@ -332,11 +321,12 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: typography.fontSizes.sm,
     color: colors.textLight,
-    marginLeft: spacing.xs,
+    marginTop: 2,
+    fontWeight: 400,
   },
   activeTabText: {
     color: colors.primary,
-    fontWeight: typography.fontWeights.medium,
+    fontWeight: 500,
   },
   content: {
     flex: 1,
@@ -362,13 +352,13 @@ const styles = StyleSheet.create({
   },
   detectedEmotionTitle: {
     fontSize: typography.fontSizes.md,
-    fontWeight: typography.fontWeights.medium,
+    fontWeight: 500,
     color: colors.text,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
   detectedEmotionText: {
     fontSize: typography.fontSizes.lg,
-    fontWeight: typography.fontWeights.bold,
+    fontWeight: 700,
     color: colors.primary,
     marginBottom: spacing.md,
   },
@@ -419,7 +409,6 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: '#fff',
     fontSize: typography.fontSizes.md,
-    fontWeight: typography.fontWeights.medium,
-    marginRight: spacing.xs,
+    fontWeight: 500,
   },
 }); 

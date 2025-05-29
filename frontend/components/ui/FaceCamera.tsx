@@ -5,11 +5,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '../../constants/theme';
 import { analyzeImage, FaceAnalysisResult } from '../../services/faceAnalysis';
 
-interface FaceCameraProps {
-  onEmotionDetected: (result: FaceAnalysisResult) => void;
+export interface FaceCameraProps {
+  onEmotionDetected?: (result: FaceAnalysisResult) => void;
+  onFaceAnalysisComplete?: (result: FaceAnalysisResult) => void;
 }
 
-export const FaceCamera: React.FC<FaceCameraProps> = ({ onEmotionDetected }) => {
+export const FaceCamera: React.FC<FaceCameraProps> = ({ 
+  onEmotionDetected, 
+  onFaceAnalysisComplete
+}) => {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -63,7 +67,13 @@ export const FaceCamera: React.FC<FaceCameraProps> = ({ onEmotionDetected }) => 
       if (result) {
         setFaceDetected(result.faceDetected);
         setLastEmotion(result.dominantEmotion);
-        onEmotionDetected(result);
+        
+        // Call the appropriate callback
+        if (onEmotionDetected) {
+          onEmotionDetected(result);
+        } else if (onFaceAnalysisComplete) {
+          onFaceAnalysisComplete(result);
+        }
       } else {
         setFaceDetected(false);
       }
@@ -202,7 +212,7 @@ const styles = StyleSheet.create({
   emotionText: {
     color: '#fff',
     fontSize: typography.fontSizes.md,
-    fontWeight: typography.fontWeights.medium,
+    fontWeight: 500,
   },
   cameraButton: {
     flexDirection: 'row',
@@ -219,7 +229,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontSize: typography.fontSizes.md,
-    fontWeight: typography.fontWeights.medium,
+    fontWeight: 500,
     marginLeft: spacing.xs,
   },
 }); 
