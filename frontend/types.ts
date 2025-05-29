@@ -45,6 +45,9 @@ export type RootStackParamList = {
   MoodDiary: undefined;
   MoodAnalysis: undefined;
   Settings: undefined;
+  MoodVisualization: {
+    emotionData: EmotionData;
+  };
 };
 
 // Theme types
