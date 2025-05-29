@@ -4,9 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { MoodVisualization } from '../components/ui/MoodVisualization';
-import { colors, spacing, typography } from '../constants/theme';
-import { RootStackParamList } from '../navigation/AppNavigator';
+import theme from '../constants/theme';
+import { RootStackParamList } from '../types';
 import { analyzeEmotions } from '../services/emotionAnalysis';
 import { saveMoodEntry } from '../services/storage';
 import { EmotionData, EmotionAnalysisResult, MoodEntry } from '../types';
@@ -20,6 +19,17 @@ type MoodVisualizationScreenRouteProp = RouteProp<
   RootStackParamList,
   'MoodVisualization'
 >;
+
+// Placeholder component for visualization
+const MoodVisualization: React.FC<{ moodAnalysis: EmotionAnalysisResult }> = ({ moodAnalysis }) => {
+  return (
+    <View style={{
+      flex: 1,
+      backgroundColor: getEmotionColor(moodAnalysis.dominantEmotion),
+      opacity: 0.7
+    }} />
+  );
+};
 
 export const MoodVisualizationScreen: React.FC = () => {
   const navigation = useNavigation<MoodVisualizationScreenNavigationProp>();
@@ -107,19 +117,27 @@ export const MoodVisualizationScreen: React.FC = () => {
           </Text>
           
           <View style={styles.emotionBars}>
-            {Object.entries(moodAnalysis.emotions).map(([emotion, value]) => (
-              <View key={emotion} style={styles.emotionBarContainer}>
-                <Text style={styles.emotionLabel}>{emotion}</Text>
-                <View style={styles.emotionBarBackground}>
-                  <View
-                    style={[
-                      styles.emotionBarFill,
-                      { width: `${value * 100}%`, backgroundColor: getEmotionColor(emotion) }
-                    ]}
-                  />
+            {Object.entries(moodAnalysis.emotions).map(([emotion, value]) => {
+              // Skip non-emotion properties
+              if (['energy', 'calmness', 'tension'].includes(emotion)) return null;
+              
+              return (
+                <View key={emotion} style={styles.emotionBarContainer}>
+                  <Text style={styles.emotionBarLabel}>{emotion}</Text>
+                  <View style={styles.emotionBarBackground}>
+                    <View
+                      style={[
+                        styles.emotionBarFill,
+                        { width: `${value * 100}%`, backgroundColor: getEmotionColor(emotion) }
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.emotionBarValue}>
+                    {Math.round(value * 100)}%
+                  </Text>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         </View>
         
@@ -156,9 +174,10 @@ const getEmotionColor = (emotion: string): string => {
     surprise: '#9932CC',
     disgust: '#228B22',
     contentment: '#4682B4',
+    neutral: '#A9A9A9',
   };
   
-  return emotionColors[emotion] || colors.primary;
+  return emotionColors[emotion] || theme.colors.primary;
 };
 
 const styles = StyleSheet.create({
@@ -169,11 +188,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: theme.colors.background,
   },
   loadingText: {
-    fontSize: typography.fontSizes.lg,
-    color: colors.text,
+    fontSize: theme.typography.fontSizes.lg,
+    color: theme.colors.text,
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
@@ -182,27 +201,27 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
+    padding: theme.spacing.md,
   },
   backButton: {
-    marginRight: spacing.md,
+    marginRight: theme.spacing.md,
   },
   headerTitle: {
-    fontSize: typography.fontSizes.lg,
-    fontWeight: 700,
+    fontSize: theme.typography.fontSizes.lg,
+    fontWeight: '700',
     color: '#fff',
   },
   infoContainer: {
     flex: 1,
     justifyContent: 'center',
-    padding: spacing.lg,
+    padding: theme.spacing.lg,
   },
   emotionLabel: {
-    fontSize: typography.fontSizes.xxxl,
-    fontWeight: 700,
+    fontSize: theme.typography.fontSizes.xxxl,
+    fontWeight: '700',
     color: '#fff',
     textAlign: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: theme.spacing.xl,
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 5,
@@ -210,42 +229,58 @@ const styles = StyleSheet.create({
   emotionBars: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 8,
-    padding: spacing.md,
+    padding: theme.spacing.md,
   },
   emotionBarContainer: {
-    marginBottom: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  emotionBarLabel: {
+    width: 80,
+    color: '#fff',
+    fontSize: theme.typography.fontSizes.sm,
   },
   emotionBarBackground: {
+    flex: 1,
     height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 4,
-    marginBottom: spacing.xs,
+    overflow: 'hidden',
   },
   emotionBarFill: {
     height: '100%',
     borderRadius: 4,
   },
+  emotionBarValue: {
+    width: 40,
+    textAlign: 'right',
+    color: '#fff',
+    fontSize: theme.typography.fontSizes.sm,
+    marginLeft: theme.spacing.sm,
+  },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    padding: spacing.lg,
+    padding: theme.spacing.lg,
   },
   button: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
     borderRadius: 8,
     flex: 1,
-    marginHorizontal: spacing.sm,
+    marginHorizontal: theme.spacing.sm,
     alignItems: 'center',
   },
   saveButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: theme.colors.primary,
   },
   diaryButton: {
-    backgroundColor: colors.secondary,
+    backgroundColor: theme.colors.secondary,
   },
   buttonText: {
     color: '#fff',
-    fontSize: typography.fontSizes.md,
-    fontWeight: 500,
+    fontSize: theme.typography.fontSizes.md,
+    fontWeight: '500',
   },
 }); 
