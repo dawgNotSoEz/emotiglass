@@ -89,6 +89,11 @@ export interface ThemeColors {
   warning: string;
   info: string;
   glassBackground: string;
+  
+  // Transparent colors for glassmorphism
+  glassLight: string;
+  glassDark: string;
+  glassBorder: string;
 }
 
 export interface ThemeSpacing {
@@ -97,6 +102,8 @@ export interface ThemeSpacing {
   md: number;
   lg: number;
   xl: number;
+  xxl: number;
+  xxxl: number;
 }
 
 export interface ThemeTypography {
@@ -107,6 +114,8 @@ export interface ThemeTypography {
     lg: number;
     xl: number;
     xxl: number;
+    xxxl: number;
+    display: number;
   };
   fontWeights: {
     light: "300";
@@ -118,22 +127,12 @@ export interface ThemeTypography {
     regular: string;
     medium: string;
     bold: string;
+    light: string;
   };
-}
-
-export interface ThemeAnimation {
-  scale: {
-    in: object;
-    out: object;
-  };
-  opacity: {
-    in: object;
-    out: object;
-  };
-  timing: {
-    fast: number;
+  lineHeights: {
+    tight: number;
     normal: number;
-    slow: number;
+    relaxed: number;
   };
 }
 
@@ -146,22 +145,65 @@ export interface ThemeRadii {
   round: number;
 }
 
+export interface ThemeGradients {
+  primary: string[];
+  secondary: string[];
+  accent: string[];
+  calm: string[];
+  warm: string[];
+  cool: string[];
+  joyful: string[];
+  sad: string[];
+  angry: string[];
+  neutral: string[];
+  dark: string[];
+}
+
+export interface ThemeShadows {
+  light: {
+    shadowColor: string;
+    shadowOffset: { width: number; height: number };
+    shadowOpacity: number;
+    shadowRadius: number;
+    elevation: number;
+  };
+  medium: {
+    shadowColor: string;
+    shadowOffset: { width: number; height: number };
+    shadowOpacity: number;
+    shadowRadius: number;
+    elevation: number;
+  };
+  heavy: {
+    shadowColor: string;
+    shadowOffset: { width: number; height: number };
+    shadowOpacity: number;
+    shadowRadius: number;
+    elevation: number;
+  };
+}
+
+export interface ThemeScreen {
+  width: number;
+  height: number;
+  isSmall: boolean;
+  isMedium: boolean;
+  isLarge: boolean;
+}
+
 export interface Theme {
   colors: ThemeColors;
   spacing: ThemeSpacing;
   typography: ThemeTypography;
   radii: ThemeRadii;
-  shadows: {
-    small: object;
-    medium: object;
-    large: object;
+  shadows: ThemeShadows;
+  gradients: ThemeGradients;
+  screen: ThemeScreen;
+  animation: {
+    fast: number;
+    medium: number;
+    slow: number;
   };
-  glass: {
-    light: object;
-    dark: object;
-    accent: object;
-  };
-  animation: ThemeAnimation;
 }
 
 // Types for drawing paths
