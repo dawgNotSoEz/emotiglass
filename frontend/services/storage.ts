@@ -1,131 +1,115 @@
 import * as SecureStore from 'expo-secure-store';
 import * as FileSystem from 'expo-file-system';
-import { EmotionData } from './emotionAnalysis';
-import { MoodAnalysis } from './emotionAnalysis';
-
-export interface MoodEntry {
-  id: string;
-  emotionData: EmotionData;
-  analysis: MoodAnalysis;
-  createdAt: number;
-}
+import { MoodEntry } from '../types';
 
 const MOOD_ENTRIES_KEY = 'emotiglass_mood_entries';
-const VOICE_RECORDINGS_DIR = `${FileSystem.documentDirectory}voice_recordings/`;
+const MOOD_ENTRIES_DIR = FileSystem.documentDirectory + 'mood_entries/';
 
-// Ensure the voice recordings directory exists
-const ensureDirectoryExists = async () => {
-  const dirInfo = await FileSystem.getInfoAsync(VOICE_RECORDINGS_DIR);
-  if (!dirInfo.exists) {
-    await FileSystem.makeDirectoryAsync(VOICE_RECORDINGS_DIR, { intermediates: true });
-  }
-};
-
-// Save a voice recording to the file system
-export const saveVoiceRecording = async (uri: string): Promise<string> => {
-  await ensureDirectoryExists();
-  
-  // Create a unique filename
-  const filename = `recording_${Date.now()}.m4a`;
-  const destination = `${VOICE_RECORDINGS_DIR}${filename}`;
-  
-  // Copy the file from temp location to our app's documents
-  await FileSystem.copyAsync({
-    from: uri,
-    to: destination,
-  });
-  
-  return destination;
-};
-
-// Delete a voice recording
-export const deleteVoiceRecording = async (uri: string): Promise<void> => {
+// Initialize storage
+export const initStorage = async (): Promise<boolean> => {
   try {
-    await FileSystem.deleteAsync(uri);
+    // Create directory for mood entries if it doesn't exist
+    const dirInfo = await FileSystem.getInfoAsync(MOOD_ENTRIES_DIR);
+    if (!dirInfo.exists) {
+      await FileSystem.makeDirectoryAsync(MOOD_ENTRIES_DIR, { intermediates: true });
+    }
+    return true;
   } catch (error) {
-    console.error('Failed to delete voice recording:', error);
+    console.error('Failed to initialize storage:', error);
+    return false;
   }
 };
 
 // Save a mood entry
-export const saveMoodEntry = async (emotionData: EmotionData, analysis: MoodAnalysis): Promise<MoodEntry> => {
-  // First, save the voice recording if it exists
-  let voiceUri = emotionData.voiceUri;
-  if (voiceUri) {
-    voiceUri = await saveVoiceRecording(voiceUri);
-    emotionData = { ...emotionData, voiceUri };
+export const saveMoodEntry = async (entry: MoodEntry): Promise<boolean> => {
+  try {
+    // Get existing entries
+    const entries = await getAllMoodEntries();
+    
+    // Add new entry
+    entries.push(entry);
+    
+    // Save entries index
+    const entryIds = entries.map(e => e.id);
+    await SecureStore.setItemAsync(MOOD_ENTRIES_KEY, JSON.stringify(entryIds));
+    
+    // Save entry data to file
+    const filePath = MOOD_ENTRIES_DIR + entry.id + '.json';
+    await FileSystem.writeAsStringAsync(filePath, JSON.stringify(entry));
+    
+    return true;
+  } catch (error) {
+    console.error('Failed to save mood entry:', error);
+    return false;
   }
-  
-  // Create a new mood entry
-  const newEntry: MoodEntry = {
-    id: `entry_${Date.now()}`,
-    emotionData,
-    analysis,
-    createdAt: Date.now(),
-  };
-  
-  // Get existing entries
-  const existingEntriesJson = await SecureStore.getItemAsync(MOOD_ENTRIES_KEY);
-  let entries: MoodEntry[] = [];
-  
-  if (existingEntriesJson) {
-    try {
-      entries = JSON.parse(existingEntriesJson);
-    } catch (error) {
-      console.error('Failed to parse existing entries:', error);
-    }
-  }
-  
-  // Add the new entry
-  entries.push(newEntry);
-  
-  // Save the updated entries
-  await SecureStore.setItemAsync(MOOD_ENTRIES_KEY, JSON.stringify(entries));
-  
-  return newEntry;
 };
 
 // Get all mood entries
 export const getAllMoodEntries = async (): Promise<MoodEntry[]> => {
-  const entriesJson = await SecureStore.getItemAsync(MOOD_ENTRIES_KEY);
-  
-  if (!entriesJson) {
-    return [];
-  }
-  
   try {
-    return JSON.parse(entriesJson);
+    // Get entry IDs
+    const entryIdsJson = await SecureStore.getItemAsync(MOOD_ENTRIES_KEY);
+    if (!entryIdsJson) {
+      return [];
+    }
+    
+    const entryIds = JSON.parse(entryIdsJson) as string[];
+    
+    // Load each entry
+    const entries: MoodEntry[] = [];
+    for (const id of entryIds) {
+      const entry = await getMoodEntry(id);
+      if (entry) {
+        entries.push(entry);
+      }
+    }
+    
+    // Sort by date (newest first)
+    return entries.sort((a, b) => b.createdAt - a.createdAt);
   } catch (error) {
-    console.error('Failed to parse mood entries:', error);
+    console.error('Failed to get mood entries:', error);
     return [];
   }
 };
 
-// Get a single mood entry by ID
-export const getMoodEntryById = async (id: string): Promise<MoodEntry | null> => {
-  const entries = await getAllMoodEntries();
-  return entries.find(entry => entry.id === id) || null;
+// Get a single mood entry
+export const getMoodEntry = async (id: string): Promise<MoodEntry | null> => {
+  try {
+    const filePath = MOOD_ENTRIES_DIR + id + '.json';
+    const fileInfo = await FileSystem.getInfoAsync(filePath);
+    
+    if (!fileInfo.exists) {
+      return null;
+    }
+    
+    const entryJson = await FileSystem.readAsStringAsync(filePath);
+    return JSON.parse(entryJson) as MoodEntry;
+  } catch (error) {
+    console.error(`Failed to get mood entry ${id}:`, error);
+    return null;
+  }
 };
 
 // Delete a mood entry
 export const deleteMoodEntry = async (id: string): Promise<boolean> => {
-  const entries = await getAllMoodEntries();
-  const entryToDelete = entries.find(entry => entry.id === id);
-  
-  if (!entryToDelete) {
+  try {
+    // Get existing entries
+    const entries = await getAllMoodEntries();
+    
+    // Remove entry
+    const updatedEntries = entries.filter(e => e.id !== id);
+    
+    // Update entries index
+    const entryIds = updatedEntries.map(e => e.id);
+    await SecureStore.setItemAsync(MOOD_ENTRIES_KEY, JSON.stringify(entryIds));
+    
+    // Delete entry file
+    const filePath = MOOD_ENTRIES_DIR + id + '.json';
+    await FileSystem.deleteAsync(filePath);
+    
+    return true;
+  } catch (error) {
+    console.error(`Failed to delete mood entry ${id}:`, error);
     return false;
   }
-  
-  // Delete the voice recording if it exists
-  if (entryToDelete.emotionData.voiceUri) {
-    await deleteVoiceRecording(entryToDelete.emotionData.voiceUri);
-  }
-  
-  // Remove the entry from the list
-  const updatedEntries = entries.filter(entry => entry.id !== id);
-  
-  // Save the updated list
-  await SecureStore.setItemAsync(MOOD_ENTRIES_KEY, JSON.stringify(updatedEntries));
-  
-  return true;
 }; 
