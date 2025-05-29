@@ -1,123 +1,107 @@
-import { Path } from '../components/ui/DrawingCanvas';
+import { EmotionData, EmotionAnalysisResult } from '../types';
 
-export interface EmotionData {
-  drawing: Path[];
-  energy: number;
-  calmness: number;
-  tension: number;
-  voiceUri?: string;
-  timestamp: number;
-}
-
-export interface MoodAnalysis {
-  dominantEmotion: string;
-  emotionVector: {
-    joy: number;
-    sadness: number;
-    anger: number;
-    fear: number;
-    surprise: number;
-    disgust: number;
-    contentment: number;
-  };
-  intensity: number;
-  visualTheme: string;
-  audioTheme: string;
-}
-
-// This is a simple local emotion analysis algorithm
-// In a production app, you might want to use a more sophisticated ML model
-// or send the data to a backend for processing
-export const analyzeEmotion = (data: EmotionData): MoodAnalysis => {
-  // Calculate intensity from energy and tension
-  const intensity = (data.energy + data.tension) / 2;
+// Analyze emotion data and return analysis result
+export const analyzeEmotion = async (data: EmotionData): Promise<EmotionAnalysisResult> => {
+  // This is a simplified emotion analysis algorithm
+  // In a real app, this could be more sophisticated or use a machine learning model
   
-  // Calculate emotional balance
-  const emotionalBalance = data.calmness - data.tension;
+  // Calculate emotion scores based on the input parameters
+  const emotionScores = calculateEmotionScores(data);
   
-  // Determine dominant emotion based on parameters
-  let dominantEmotion = 'neutral';
-  let emotionVector = {
-    joy: 0.1,
-    sadness: 0.1,
-    anger: 0.1,
-    fear: 0.1,
-    surprise: 0.1,
-    disgust: 0.1,
-    contentment: 0.1,
-  };
+  // Find the dominant emotion (highest score)
+  const dominantEmotion = Object.entries(emotionScores)
+    .reduce((max, [emotion, score]) => score > max.score ? { emotion, score } : max, { emotion: 'neutral', score: 0 })
+    .emotion;
   
-  // High energy, high calmness = joy
-  if (data.energy > 70 && data.calmness > 70) {
-    dominantEmotion = 'joy';
-    emotionVector.joy = 0.8;
-    emotionVector.contentment = 0.6;
-  } 
-  // Low energy, high calmness = contentment
-  else if (data.energy < 30 && data.calmness > 70) {
-    dominantEmotion = 'contentment';
-    emotionVector.contentment = 0.8;
-    emotionVector.joy = 0.3;
-  }
-  // High energy, low calmness, high tension = anger
-  else if (data.energy > 70 && data.calmness < 30 && data.tension > 70) {
-    dominantEmotion = 'anger';
-    emotionVector.anger = 0.8;
-    emotionVector.disgust = 0.4;
-  }
-  // Low energy, low calmness, high tension = sadness
-  else if (data.energy < 30 && data.calmness < 50 && data.tension > 50) {
-    dominantEmotion = 'sadness';
-    emotionVector.sadness = 0.8;
-    emotionVector.fear = 0.3;
-  }
-  // High tension, moderate energy = fear/anxiety
-  else if (data.tension > 70 && data.energy > 40 && data.energy < 60) {
-    dominantEmotion = 'fear';
-    emotionVector.fear = 0.8;
-    emotionVector.surprise = 0.4;
-  }
-  // High energy, moderate tension, moderate calmness = surprise
-  else if (data.energy > 70 && data.tension > 40 && data.tension < 60 && data.calmness > 40 && data.calmness < 60) {
-    dominantEmotion = 'surprise';
-    emotionVector.surprise = 0.8;
-    emotionVector.joy = 0.3;
-  }
-  // Low calmness, moderate tension, moderate energy = disgust
-  else if (data.calmness < 30 && data.tension > 40 && data.tension < 60 && data.energy > 40 && data.energy < 60) {
-    dominantEmotion = 'disgust';
-    emotionVector.disgust = 0.8;
-    emotionVector.anger = 0.3;
-  }
+  // Calculate overall emotional intensity (0-100)
+  const intensity = calculateIntensity(data);
   
-  // Determine visual and audio themes based on dominant emotion
-  const visualThemes: Record<string, string> = {
-    joy: 'sunny_sky',
-    contentment: 'gentle_waves',
-    anger: 'stormy_clouds',
-    sadness: 'rainy_window',
-    fear: 'dark_forest',
-    surprise: 'aurora_borealis',
-    disgust: 'murky_swamp',
-    neutral: 'calm_meadow',
-  };
-  
-  const audioThemes: Record<string, string> = {
-    joy: 'upbeat_melody',
-    contentment: 'gentle_ambient',
-    anger: 'intense_drums',
-    sadness: 'slow_piano',
-    fear: 'tense_strings',
-    surprise: 'sudden_chimes',
-    disgust: 'discordant_tones',
-    neutral: 'soft_ambient',
-  };
+  // Generate a description of the emotional state
+  const description = generateDescription(dominantEmotion, intensity);
   
   return {
     dominantEmotion,
-    emotionVector,
+    emotionScores,
     intensity,
-    visualTheme: visualThemes[dominantEmotion],
-    audioTheme: audioThemes[dominantEmotion],
+    description,
   };
+};
+
+// Calculate emotion scores based on the input parameters
+const calculateEmotionScores = (data: EmotionData): Record<string, number> => {
+  const { energy, calmness, tension } = data;
+  
+  // Convert slider values to emotion scores
+  // This is a simplified mapping - a real implementation could be more nuanced
+  return {
+    joy: normalizeScore((energy * 0.7) + (calmness * 0.3) - (tension * 0.5)),
+    contentment: normalizeScore((calmness * 0.8) - (energy * 0.2) - (tension * 0.6)),
+    anger: normalizeScore((tension * 0.8) + (energy * 0.4) - (calmness * 0.8)),
+    sadness: normalizeScore((tension * 0.4) - (energy * 0.8) + (calmness * 0.1)),
+    fear: normalizeScore((tension * 0.7) - (calmness * 0.7) + (energy * 0.1)),
+    surprise: normalizeScore((energy * 0.6) + (tension * 0.3) - (calmness * 0.2)),
+    disgust: normalizeScore((tension * 0.5) - (calmness * 0.5) - (energy * 0.2)),
+    neutral: normalizeScore(100 - Math.max(energy, calmness, tension)),
+  };
+};
+
+// Calculate overall emotional intensity
+const calculateIntensity = (data: EmotionData): number => {
+  const { energy, tension } = data;
+  return Math.min(100, Math.max(0, (energy * 0.6) + (tension * 0.4)));
+};
+
+// Generate a description of the emotional state
+const generateDescription = (emotion: string, intensity: number): string => {
+  const intensityLevel = intensity < 30 ? 'mild' : intensity < 70 ? 'moderate' : 'strong';
+  
+  const descriptions: Record<string, Record<string, string>> = {
+    joy: {
+      mild: 'You seem to be feeling a bit of happiness.',
+      moderate: 'You appear to be in a good mood.',
+      strong: 'You seem to be experiencing intense joy!',
+    },
+    contentment: {
+      mild: 'You seem to be feeling slightly at ease.',
+      moderate: 'You appear to be feeling content and peaceful.',
+      strong: 'You seem to be experiencing deep contentment and serenity.',
+    },
+    anger: {
+      mild: 'You seem to be feeling a bit irritated.',
+      moderate: 'You appear to be feeling frustrated or annoyed.',
+      strong: 'You seem to be experiencing strong anger.',
+    },
+    sadness: {
+      mild: 'You seem to be feeling a touch of sadness.',
+      moderate: 'You appear to be feeling down or blue.',
+      strong: 'You seem to be experiencing deep sadness.',
+    },
+    fear: {
+      mild: 'You seem to be feeling slightly anxious.',
+      moderate: 'You appear to be feeling worried or nervous.',
+      strong: 'You seem to be experiencing significant fear or anxiety.',
+    },
+    surprise: {
+      mild: 'You seem to be feeling a bit surprised.',
+      moderate: 'You appear to be feeling astonished.',
+      strong: 'You seem to be experiencing shock or amazement.',
+    },
+    disgust: {
+      mild: 'You seem to be feeling slightly put off.',
+      moderate: 'You appear to be feeling disgusted.',
+      strong: 'You seem to be experiencing strong revulsion.',
+    },
+    neutral: {
+      mild: 'Your emotions seem balanced.',
+      moderate: 'You appear to be in a neutral state.',
+      strong: 'You seem to be in a very balanced emotional state.',
+    },
+  };
+  
+  return descriptions[emotion]?.[intensityLevel] || 'Your emotional state is unclear.';
+};
+
+// Normalize a score to be between 0 and 1
+const normalizeScore = (value: number): number => {
+  return Math.max(0, Math.min(1, value / 100));
 }; 
