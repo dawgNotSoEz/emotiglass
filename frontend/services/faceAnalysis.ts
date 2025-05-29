@@ -1,5 +1,5 @@
 import * as FileSystem from 'expo-file-system';
-import { EmotionData } from './emotionAnalysis';
+import { EmotionData } from '../types';
 
 // Emotion mapping constants
 const EMOTION_CLASSES = ['neutral', 'happy', 'sad', 'surprise', 'fear', 'disgust', 'anger'];
