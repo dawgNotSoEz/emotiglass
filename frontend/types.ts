@@ -10,6 +10,10 @@ export interface EmotionData {
   disgust: number;
   contentment: number;
   neutral: number;
+  // Additional emotion parameters
+  energy: number;
+  calmness: number;
+  tension: number;
 }
 
 // Result of emotion analysis
@@ -18,6 +22,7 @@ export interface EmotionAnalysisResult {
   dominantEmotion: keyof EmotionData;
   confidence: number;
   timestamp: number;
+  intensity: number; // Overall intensity of emotion
 }
 
 // Mood entry for storage
