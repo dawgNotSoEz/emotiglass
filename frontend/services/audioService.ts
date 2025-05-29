@@ -136,12 +136,17 @@ export const analyzeAudioRecording = async (uri: string): Promise<EmotionAnalysi
       surprise: Math.random() * 0.1,
       disgust: Math.random() * 0.05,
       contentment: Math.random() * 0.3,
-      neutral: Math.random() * 0.2
+      neutral: Math.random() * 0.2,
+      energy: Math.random() * 100,
+      calmness: Math.random() * 100,
+      tension: Math.random() * 100
     };
     
     // Normalize to ensure values sum to 1
-    const total = Object.values(emotions).reduce((sum, val) => sum + val, 0);
-    Object.keys(emotions).forEach(key => {
+    const emotionKeys = ['joy', 'sadness', 'anger', 'fear', 'surprise', 'disgust', 'contentment', 'neutral'];
+    const total = emotionKeys.reduce((sum, key) => sum + emotions[key as keyof EmotionData], 0);
+    
+    emotionKeys.forEach(key => {
       const emotionKey = key as keyof EmotionData;
       emotions[emotionKey] = emotions[emotionKey] / total;
     });
@@ -158,7 +163,10 @@ export const analyzeAudioRecording = async (uri: string): Promise<EmotionAnalysi
       surprise: 0,
       disgust: 0,
       contentment: 0,
-      neutral: 1
+      neutral: 1,
+      energy: 50,
+      calmness: 50,
+      tension: 50
     };
     return analyzeEmotions(neutralEmotions);
   }
