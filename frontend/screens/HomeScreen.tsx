@@ -28,6 +28,12 @@ export const HomeScreen: React.FC = () => {
           onPress={() => navigation.navigate('MoodDiary')} 
           style={styles.button}
         />
+        <Button 
+          title="Mood Analysis" 
+          variant="outline" 
+          onPress={() => navigation.navigate('MoodAnalysis')} 
+          style={styles.button}
+        />
       </View>
     </View>
   );
