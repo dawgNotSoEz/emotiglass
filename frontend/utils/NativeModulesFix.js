@@ -33,15 +33,18 @@ const createSafeModule = (moduleName) => {
 
 // Fix common problematic modules
 export const fixNativeModules = () => {
-  if (!global.HermesInternal) return; // Only apply fixes for Hermes
+  // Apply fixes for all JavaScript engines, not just Hermes
   
   const modulesToFix = [
     'PlatformConstants',
     'ExponentConstants',
+    'ExpoConstants',
     'RNGestureHandlerModule',
     'RCTDeviceEventEmitter',
     'UIManager',
-    'RCTLinkingManager'
+    'RCTLinkingManager',
+    'ExponentAV',
+    'ExponentCamera'
   ];
   
   modulesToFix.forEach(moduleName => {
@@ -65,6 +68,15 @@ export const fixNativeModules = () => {
         return global[name] || createSafeModule(name);
       }
     };
+  }
+  
+  // Special handling for expo-constants
+  if (NativeModules.ExponentConstants && !NativeModules.ExponentConstants.getConstants) {
+    NativeModules.ExponentConstants.getConstants = () => ({
+      statusBarHeight: 0,
+      deviceName: 'Unknown',
+      deviceYearClass: 2023,
+    });
   }
 };
 
