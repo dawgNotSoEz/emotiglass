@@ -7,8 +7,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { MoodVisualization } from '../components/ui/MoodVisualization';
 import { colors, spacing, typography } from '../constants/theme';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { analyzeEmotion, EmotionData, MoodAnalysis } from '../services/emotionAnalysis';
+import { analyzeEmotion } from '../services/emotionAnalysis';
 import { saveMoodEntry } from '../services/storage';
+import { EmotionData, EmotionAnalysisResult, MoodEntry } from '../types';
 
 type MoodVisualizationScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -25,14 +26,18 @@ export const MoodVisualizationScreen: React.FC = () => {
   const route = useRoute<MoodVisualizationScreenRouteProp>();
   const { emotionData } = route.params;
   
-  const [moodAnalysis, setMoodAnalysis] = useState<MoodAnalysis | null>(null);
+  const [moodAnalysis, setMoodAnalysis] = useState<EmotionAnalysisResult | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
   
   useEffect(() => {
     // Analyze the emotion data
-    const analysis = analyzeEmotion(emotionData);
-    setMoodAnalysis(analysis);
+    const analyzeData = async () => {
+      const analysis = await analyzeEmotion(emotionData);
+      setMoodAnalysis(analysis);
+    };
+    
+    analyzeData();
   }, [emotionData]);
   
   const handleSave = async () => {
@@ -40,7 +45,15 @@ export const MoodVisualizationScreen: React.FC = () => {
     
     setIsSaving(true);
     try {
-      await saveMoodEntry(emotionData, moodAnalysis);
+      // Create a mood entry
+      const moodEntry: MoodEntry = {
+        id: Date.now().toString(),
+        createdAt: Date.now(),
+        emotionData,
+        analysis: moodAnalysis
+      };
+      
+      await saveMoodEntry(moodEntry);
       setSaveComplete(true);
       
       // Reset state after a short delay
@@ -89,7 +102,7 @@ export const MoodVisualizationScreen: React.FC = () => {
           </Text>
           
           <View style={styles.emotionStats}>
-            {Object.entries(moodAnalysis.emotionVector).map(([emotion, value]) => (
+            {Object.entries(moodAnalysis.emotionScores).map(([emotion, value]) => (
               <View key={emotion} style={styles.statItem}>
                 <View 
                   style={[
@@ -169,7 +182,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: typography.fontSizes.lg,
-    fontWeight: typography.fontWeights.bold,
+    fontWeight: 700,
     color: '#fff',
   },
   infoContainer: {
@@ -179,7 +192,7 @@ const styles = StyleSheet.create({
   },
   emotionLabel: {
     fontSize: typography.fontSizes.xxxl,
-    fontWeight: typography.fontWeights.bold,
+    fontWeight: 700,
     color: '#fff',
     textAlign: 'center',
     marginBottom: spacing.xl,
@@ -227,6 +240,6 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontSize: typography.fontSizes.md,
-    fontWeight: typography.fontWeights.medium,
+    fontWeight: 500,
   },
 }); 
