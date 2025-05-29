@@ -12,7 +12,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../constants/theme';
-import { getAllMoodEntries, MoodEntry, deleteMoodEntry } from '../services/storage';
+import { getAllMoodEntries, deleteMoodEntry } from '../services/storage';
 import { MoodEntry, RootStackParamList } from '../types';
 
 type MoodDiaryScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MoodDiary'>;
