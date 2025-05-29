@@ -23,7 +23,6 @@ interface Particle {
   y: number;
   opacity: number;
   speed: number;
-  angle: number;
 }
 
 export const EmotionParticles: React.FC<EmotionParticlesProps> = ({ 
@@ -47,7 +46,6 @@ export const EmotionParticles: React.FC<EmotionParticlesProps> = ({
       y: Math.random() * height,
       opacity: Math.random() * 0.6 + 0.2,
       speed: Math.random() * 2 + 0.5 + intensity,
-      angle: Math.random() * Math.PI * 2,
     }));
   }, [moodAnalysis, width, height, count]);
 
@@ -76,8 +74,6 @@ const ParticleItem: React.FC<ParticleItemProps> = ({
   intensity,
   emotion 
 }) => {
-  const { width, height } = Dimensions.get('window');
-  
   // Animation values
   const translateX = useSharedValue(particle.x);
   const translateY = useSharedValue(particle.y);
@@ -89,18 +85,21 @@ const ParticleItem: React.FC<ParticleItemProps> = ({
     // Duration varies by emotion
     const duration = getEmotionDuration(emotion, intensity);
     
-    // Movement pattern varies by emotion
-    const movementPattern = getEmotionMovement(emotion, particle, width, height);
+    // Animations that use the particle speed
+    const distance = 100 * particle.speed;
     
-    // Apply animations
     translateX.value = withRepeat(
-      withSequence(...movementPattern.x),
-      -1, // Infinite repeat
-      true // Reverse
+      withTiming(particle.x + (Math.random() - 0.5) * distance, { 
+        duration: duration * 1.5 / particle.speed
+      }),
+      -1,
+      true
     );
     
     translateY.value = withRepeat(
-      withSequence(...movementPattern.y),
+      withTiming(particle.y + (Math.random() - 0.5) * distance, { 
+        duration: duration / particle.speed
+      }),
       -1,
       true
     );
@@ -108,8 +107,14 @@ const ParticleItem: React.FC<ParticleItemProps> = ({
     // Scale animation
     scale.value = withRepeat(
       withSequence(
-        withTiming(1.2, { duration: duration * 0.5, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.8, { duration: duration * 0.5, easing: Easing.inOut(Easing.ease) })
+        withTiming(1.2, { 
+          duration: duration * 0.5 / particle.speed, 
+          easing: Easing.inOut(Easing.ease) 
+        }),
+        withTiming(0.8, { 
+          duration: duration * 0.5 / particle.speed, 
+          easing: Easing.inOut(Easing.ease) 
+        })
       ),
       -1,
       true
@@ -124,7 +129,7 @@ const ParticleItem: React.FC<ParticleItemProps> = ({
       -1,
       true
     );
-  }, [emotion, intensity, particle, width, height]);
+  }, [emotion, intensity, particle]);
   
   // Animated styles
   const animatedStyle = useAnimatedStyle(() => {
@@ -188,74 +193,6 @@ const getEmotionDuration = (emotion: string, intensity: number): number => {
   // Adjust duration based on intensity (higher intensity = faster)
   const base = baseDurations[emotion] || 2000;
   return base - (base * 0.5 * intensity);
-};
-
-const getEmotionMovement = (
-  emotion: string, 
-  particle: Particle, 
-  width: number, 
-  height: number
-) => {
-  // Different movement patterns for different emotions
-  const range = 100; // Base movement range
-  
-  switch (emotion) {
-    case 'joy':
-      // Bouncy, energetic movement
-      return {
-        x: [
-          withTiming(particle.x + range * 1.5 * (Math.random() - 0.5), { duration: 2000 }),
-          withTiming(particle.x - range * (Math.random() - 0.5), { duration: 1500 }),
-        ],
-        y: [
-          withTiming(particle.y - range * 1.2, { duration: 1800 }),
-          withTiming(particle.y + range * 0.8, { duration: 1200 }),
-        ],
-      };
-      
-    case 'sadness':
-      // Slow, downward drift
-      return {
-        x: [
-          withTiming(particle.x + range * 0.3 * (Math.random() - 0.5), { duration: 4000 }),
-          withTiming(particle.x - range * 0.3 * (Math.random() - 0.5), { duration: 4000 }),
-        ],
-        y: [
-          withTiming(particle.y + range * 0.8, { duration: 5000 }),
-          withTiming(particle.y + range * 0.4, { duration: 3000 }),
-        ],
-      };
-      
-    case 'anger':
-      // Rapid, erratic movement
-      return {
-        x: [
-          withTiming(particle.x + range * 2 * (Math.random() - 0.5), { duration: 800 }),
-          withTiming(particle.x - range * 2 * (Math.random() - 0.5), { duration: 600 }),
-          withTiming(particle.x + range * 1.5 * (Math.random() - 0.5), { duration: 700 }),
-        ],
-        y: [
-          withTiming(particle.y - range * (Math.random() - 0.5), { duration: 700 }),
-          withTiming(particle.y + range * (Math.random() - 0.5), { duration: 800 }),
-          withTiming(particle.y - range * (Math.random() - 0.5), { duration: 600 }),
-        ],
-      };
-      
-    // Add cases for other emotions...
-      
-    default:
-      // Gentle, floating movement for neutral and other emotions
-      return {
-        x: [
-          withTiming(particle.x + range * (Math.random() - 0.5), { duration: 3000 }),
-          withTiming(particle.x - range * (Math.random() - 0.5), { duration: 3000 }),
-        ],
-        y: [
-          withTiming(particle.y - range * 0.5, { duration: 3000 }),
-          withTiming(particle.y + range * 0.5, { duration: 3000 }),
-        ],
-      };
-  }
 };
 
 const styles = StyleSheet.create({
