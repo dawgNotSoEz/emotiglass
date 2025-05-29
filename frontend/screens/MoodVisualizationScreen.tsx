@@ -48,9 +48,14 @@ export const MoodVisualizationScreen: React.FC = () => {
       // Create a mood entry
       const moodEntry: MoodEntry = {
         id: Date.now().toString(),
+        timestamp: Date.now(),
         createdAt: Date.now(),
-        emotionData,
-        analysis: moodAnalysis
+        date: new Date().toISOString().split('T')[0],
+        emotions: emotionData,
+        dominantEmotion: moodAnalysis.dominantEmotion,
+        confidence: moodAnalysis.confidence,
+        notes: '',
+        source: 'sliders'
       };
       
       await saveMoodEntry(moodEntry);
