@@ -1,10 +1,12 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, TouchableOpacityProps } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, TouchableOpacityProps, StyleProp, ViewStyle } from 'react-native';
 import { colors, spacing, typography } from '../../constants/theme';
 
 interface ButtonProps extends TouchableOpacityProps {
   title: string;
   variant?: 'primary' | 'secondary' | 'outline';
+  onPress?: () => void;
+  style?: StyleProp<ViewStyle>;
 }
 
 export const Button: React.FC<ButtonProps> = ({ 

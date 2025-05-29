@@ -2,8 +2,15 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '../components/ui/Button';
 import { colors, spacing, typography } from '../constants/theme';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
+
+type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
 
 export const HomeScreen: React.FC = () => {
+  const navigation = useNavigation<HomeScreenNavigationProp>();
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>EmotiGlass</Text>
@@ -12,13 +19,13 @@ export const HomeScreen: React.FC = () => {
       <View style={styles.buttonContainer}>
         <Button 
           title="Get Started" 
-          onPress={() => console.log('Get Started pressed')} 
+          onPress={() => navigation.navigate('EmotionInput')} 
           style={styles.button}
         />
         <Button 
-          title="Learn More" 
+          title="View Mood Diary" 
           variant="outline" 
-          onPress={() => console.log('Learn More pressed')} 
+          onPress={() => navigation.navigate('MoodDiary')} 
           style={styles.button}
         />
       </View>
