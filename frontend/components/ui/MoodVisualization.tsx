@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import { Audio } from 'expo-av';
 import { EmotionAnalysisResult } from '../../types';
-import { EmotionParticles } from '../visualizations/SimpleEmotionParticles';
+import { SimpleEmotionParticles } from '../visualizations/SimpleEmotionParticles';
 import { EmotionWaves } from '../visualizations/EmotionWaves';
 
 interface MoodVisualizationProps {
@@ -80,7 +80,7 @@ export const MoodVisualization: React.FC<MoodVisualizationProps> = ({ moodAnalys
       <EmotionWaves moodAnalysis={moodAnalysis} />
       
       {/* Particle system */}
-      <EmotionParticles 
+      <SimpleEmotionParticles 
         moodAnalysis={moodAnalysis} 
         count={Math.round(30 + (moodAnalysis.intensity / 100) * 40)} 
       />
