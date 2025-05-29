@@ -7,33 +7,66 @@ const DRAWINGS_DIR = FileSystem.documentDirectory + 'drawings/';
 // Helper function to ensure directory exists
 const ensureDirectoryExists = async (directory: string): Promise<boolean> => {
   try {
+    console.log(`[drawingService] Checking if directory exists: ${directory}`);
     const dirInfo = await FileSystem.getInfoAsync(directory);
     
     if (!dirInfo.exists) {
-      console.log(`Creating directory: ${directory}`);
-      await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
-      
-      // Verify directory was created
-      const verifyInfo = await FileSystem.getInfoAsync(directory);
-      if (!verifyInfo.exists) {
-        console.error(`Failed to create directory: ${directory}`);
+      console.log(`[drawingService] Creating directory: ${directory}`);
+      try {
+        await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+      } catch (dirError) {
+        console.error(`[drawingService] Error creating directory: ${directory}`, dirError);
         return false;
       }
+      
+      // Double-check that the directory was created
+      try {
+        const verifyInfo = await FileSystem.getInfoAsync(directory);
+        if (!verifyInfo.exists) {
+          console.error(`[drawingService] Directory not created despite no errors: ${directory}`);
+          return false;
+        }
+      } catch (verifyError) {
+        console.error(`[drawingService] Error verifying directory: ${directory}`, verifyError);
+        return false;
+      }
+      
+      console.log(`[drawingService] Directory created successfully: ${directory}`);
+    } else {
+      console.log(`[drawingService] Directory already exists: ${directory}`);
+    }
+    
+    // Check if directory is writable by trying to write a test file
+    try {
+      const testFile = `${directory}test_${Date.now()}.txt`;
+      await FileSystem.writeAsStringAsync(testFile, 'test');
+      await FileSystem.deleteAsync(testFile, { idempotent: true });
+      console.log(`[drawingService] Directory is writable: ${directory}`);
+    } catch (writeError) {
+      console.error(`[drawingService] Directory is not writable: ${directory}`, writeError);
+      return false;
     }
     
     return true;
   } catch (error) {
-    console.error(`Error ensuring directory exists: ${directory}`, error);
+    console.error(`[drawingService] Error ensuring directory exists: ${directory}`, error);
     return false;
   }
 };
 
 // Create drawings directory if it doesn't exist
 export const initDrawingStorage = async (): Promise<boolean> => {
+  console.log('[drawingService] Initializing drawing storage...');
   try {
-    return await ensureDirectoryExists(DRAWINGS_DIR);
+    const dirCreated = await ensureDirectoryExists(DRAWINGS_DIR);
+    if (dirCreated) {
+      console.log('[drawingService] Drawing storage initialized successfully');
+    } else {
+      console.error('[drawingService] Failed to initialize drawing storage');
+    }
+    return dirCreated;
   } catch (error) {
-    console.error('Failed to initialize drawing storage:', error);
+    console.error('[drawingService] Failed to initialize drawing storage:', error);
     return false;
   }
 };
@@ -44,11 +77,21 @@ export const initDrawingStorage = async (): Promise<boolean> => {
  * @returns URI of saved drawing
  */
 export const saveDrawing = async (drawingData: string): Promise<string | null> => {
+  console.log('[drawingService] Saving drawing...');
+  
+  // Parse drawing data to verify it's valid
+  try {
+    JSON.parse(drawingData);
+  } catch (parseError) {
+    console.error('[drawingService] Invalid drawing data:', parseError);
+    return null;
+  }
+  
   try {
     // Ensure directory exists
     const dirCreated = await ensureDirectoryExists(DRAWINGS_DIR);
     if (!dirCreated) {
-      console.error('Failed to create drawings directory');
+      console.error('[drawingService] Failed to create drawings directory');
       return null;
     }
     
@@ -57,13 +100,22 @@ export const saveDrawing = async (drawingData: string): Promise<string | null> =
     const fileName = `drawing_${timestamp}.json`;
     const fileUri = DRAWINGS_DIR + fileName;
     
+    console.log(`[drawingService] Writing drawing to: ${fileUri}`);
+    
     // Write drawing data to file
     await FileSystem.writeAsStringAsync(fileUri, drawingData);
-    console.log(`Drawing saved to: ${fileUri}`);
     
+    // Verify file was written
+    const fileInfo = await FileSystem.getInfoAsync(fileUri);
+    if (!fileInfo.exists) {
+      console.error(`[drawingService] File not created despite no errors: ${fileUri}`);
+      return null;
+    }
+    
+    console.log(`[drawingService] Drawing saved to: ${fileUri}`);
     return fileUri;
   } catch (error) {
-    console.error('Failed to save drawing:', error);
+    console.error('[drawingService] Failed to save drawing:', error);
     return null;
   }
 };
