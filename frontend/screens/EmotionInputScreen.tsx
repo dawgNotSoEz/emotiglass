@@ -12,10 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import colors from '../constants/theme';
-import spacing from '../constants/theme';
-import typography from '../constants/theme';
-import { RootStackParamList } from '../navigation/AppNavigator';
+import theme from '../constants/theme';
 import { EmotionSlider } from '../components/ui/EmotionSlider';
 import { DrawingCanvas } from '../components/ui/DrawingCanvas';
 import { VoiceRecorder } from '../components/ui/VoiceRecorder';
@@ -30,12 +27,17 @@ export const EmotionInputScreen: React.FC = () => {
   const navigation = useNavigation<EmotionInputScreenNavigationProp>();
   const [activeTab, setActiveTab] = useState<'sliders' | 'drawing' | 'voice' | 'face'>('sliders');
   const [emotionData, setEmotionData] = useState<EmotionData>({
+    joy: 0,
+    sadness: 0,
+    anger: 0,
+    fear: 0,
+    surprise: 0,
+    disgust: 0,
+    contentment: 0,
+    neutral: 1,
     energy: 50,
     calmness: 50,
-    tension: 50,
-    drawing: null,
-    voiceNote: null,
-    notes: '',
+    tension: 50
   });
   const [faceAnalysis, setFaceAnalysis] = useState<FaceAnalysisResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -100,7 +102,7 @@ export const EmotionInputScreen: React.FC = () => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>How are you feeling?</Text>
       </View>
@@ -113,7 +115,7 @@ export const EmotionInputScreen: React.FC = () => {
           <Ionicons 
             name="options" 
             size={20} 
-            color={activeTab === 'sliders' ? colors.primary : colors.textLight} 
+            color={activeTab === 'sliders' ? theme.colors.primary : theme.colors.textLight} 
           />
           <Text 
             style={[
@@ -132,7 +134,7 @@ export const EmotionInputScreen: React.FC = () => {
           <Ionicons 
             name="brush" 
             size={20} 
-            color={activeTab === 'drawing' ? colors.primary : colors.textLight} 
+            color={activeTab === 'drawing' ? theme.colors.primary : theme.colors.textLight} 
           />
           <Text 
             style={[
@@ -151,7 +153,7 @@ export const EmotionInputScreen: React.FC = () => {
           <Ionicons 
             name="mic" 
             size={20} 
-            color={activeTab === 'voice' ? colors.primary : colors.textLight} 
+            color={activeTab === 'voice' ? theme.colors.primary : theme.colors.textLight} 
           />
           <Text 
             style={[
@@ -170,7 +172,7 @@ export const EmotionInputScreen: React.FC = () => {
           <Ionicons 
             name="camera" 
             size={20} 
-            color={activeTab === 'face' ? colors.primary : colors.textLight} 
+            color={activeTab === 'face' ? theme.colors.primary : theme.colors.textLight} 
           />
           <Text 
             style={[
@@ -286,131 +288,131 @@ export const EmotionInputScreen: React.FC = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
+    padding: theme.spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: theme.colors.border,
   },
   backButton: {
-    marginRight: spacing.md,
+    marginRight: theme.spacing.md,
   },
   headerTitle: {
-    fontSize: typography.fontSizes.lg,
+    fontSize: theme.typography.fontSizes.lg,
     fontWeight: '700',
-    color: colors.text,
+    color: theme.colors.text,
   },
   tabContainer: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: theme.colors.border,
   },
   tab: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xs,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.xs,
   },
   activeTab: {
     borderBottomWidth: 2,
-    borderBottomColor: colors.primary,
+    borderBottomColor: theme.colors.primary,
   },
   tabText: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.textLight,
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textLight,
     marginTop: 2,
     fontWeight: '400',
   },
   activeTabText: {
-    color: colors.primary,
+    color: theme.colors.primary,
     fontWeight: '500',
   },
   content: {
     flex: 1,
-    padding: spacing.md,
+    padding: theme.spacing.md,
   },
   slidersContainer: {
-    marginVertical: spacing.md,
+    marginVertical: theme.spacing.md,
   },
   drawingContainer: {
-    marginVertical: spacing.md,
+    marginVertical: theme.spacing.md,
   },
   voiceContainer: {
-    marginVertical: spacing.md,
+    marginVertical: theme.spacing.md,
   },
   faceContainer: {
-    marginVertical: spacing.md,
+    marginVertical: theme.spacing.md,
   },
   detectedEmotionContainer: {
-    marginTop: spacing.md,
-    padding: spacing.md,
-    backgroundColor: colors.cardBackground,
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.cardBackground,
     borderRadius: 8,
   },
   detectedEmotionTitle: {
-    fontSize: typography.fontSizes.md,
+    fontSize: theme.typography.fontSizes.md,
     fontWeight: '500',
-    color: colors.text,
-    marginBottom: spacing.xs,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
   },
   detectedEmotionText: {
-    fontSize: typography.fontSizes.lg,
+    fontSize: theme.typography.fontSizes.lg,
     fontWeight: '700',
-    color: colors.primary,
-    marginBottom: spacing.md,
+    color: theme.colors.primary,
+    marginBottom: theme.spacing.md,
   },
   emotionScoresContainer: {
-    marginTop: spacing.sm,
+    marginTop: theme.spacing.sm,
   },
   emotionScoreItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    marginBottom: theme.spacing.xs,
   },
   emotionScoreLabel: {
     width: 80,
-    fontSize: typography.fontSizes.sm,
-    color: colors.text,
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.text,
   },
   emotionScoreBarContainer: {
     flex: 1,
     height: 8,
-    backgroundColor: colors.border,
+    backgroundColor: theme.colors.border,
     borderRadius: 4,
     overflow: 'hidden',
-    marginHorizontal: spacing.sm,
+    marginHorizontal: theme.spacing.sm,
   },
   emotionScoreBar: {
     height: '100%',
-    backgroundColor: colors.primary,
+    backgroundColor: theme.colors.primary,
   },
   emotionScoreValue: {
     width: 40,
-    fontSize: typography.fontSizes.sm,
-    color: colors.textLight,
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textLight,
     textAlign: 'right',
   },
   footer: {
-    padding: spacing.md,
+    padding: theme.spacing.md,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: theme.colors.border,
   },
   submitButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary,
-    paddingVertical: spacing.md,
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.md,
     borderRadius: 8,
   },
   submitButtonText: {
     color: '#fff',
-    fontSize: typography.fontSizes.md,
+    fontSize: theme.typography.fontSizes.md,
     fontWeight: '500',
   },
 }); 
