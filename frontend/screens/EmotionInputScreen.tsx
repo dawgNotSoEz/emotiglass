@@ -18,7 +18,7 @@ import { DrawingCanvas } from '../components/ui/DrawingCanvas';
 import { VoiceRecorder } from '../components/ui/VoiceRecorder';
 import { FaceCamera } from '../components/ui/FaceCamera';
 import { analyzeEmotions } from '../services/emotionAnalysis';
-import { EmotionData, EmotionAnalysisResult } from '../types';
+import { EmotionData, EmotionAnalysisResult, RootStackParamList } from '../types';
 import { FaceAnalysisResult, integrateEmotionData } from '../services/faceAnalysis';
 
 type EmotionInputScreenNavigationProp = StackNavigationProp<RootStackParamList, 'EmotionInput'>;
