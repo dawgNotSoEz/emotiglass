@@ -1,44 +1,19 @@
 import { EmotionData, EmotionAnalysisResult } from '../types';
+import { generateEmotionAnalysis } from './dummyData';
 
 /**
  * Analyzes emotion data and returns an analysis result
  * @param emotions The emotion data to analyze
  * @returns An analysis result with the dominant emotion and confidence
  */
-export const analyzeEmotions = (emotions: EmotionData): EmotionAnalysisResult => {
-  // Find the dominant emotion (highest score)
-  let dominantEmotion: keyof EmotionData = 'neutral';
-  let highestScore = 0;
-  
-  // Check each emotion
-  Object.entries(emotions).forEach(([emotion, score]) => {
-    if (emotion !== 'energy' && emotion !== 'calmness' && emotion !== 'tension' && score > highestScore) {
-      highestScore = score;
-      dominantEmotion = emotion as keyof EmotionData;
-    }
+export const analyzeEmotions = async (emotions: EmotionData): Promise<EmotionAnalysisResult> => {
+  // In a prototype version, we'll use dummy data for demonstration
+  return new Promise((resolve) => {
+    // Add a small delay to simulate processing
+    setTimeout(() => {
+      resolve(generateEmotionAnalysis(emotions));
+    }, 1000);
   });
-  
-  // Calculate confidence (normalized score of dominant emotion)
-  const emotionScores = Object.entries(emotions)
-    .filter(([key]) => !['energy', 'calmness', 'tension'].includes(key))
-    .map(([_, score]) => score);
-  
-  const totalScore = emotionScores.reduce((sum, score) => sum + score, 0);
-  const confidence = totalScore > 0 ? highestScore / totalScore : 0;
-  
-  // Calculate intensity based on dominant emotion and energy
-  const intensity = Math.min(100, Math.max(0, 
-    emotions.energy * 0.4 + 
-    (emotions[dominantEmotion] * 100) * 0.6
-  ));
-  
-  return {
-    emotions,
-    dominantEmotion,
-    confidence,
-    timestamp: Date.now(),
-    intensity
-  };
 };
 
 /**
