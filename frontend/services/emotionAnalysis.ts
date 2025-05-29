@@ -1,107 +1,128 @@
 import { EmotionData, EmotionAnalysisResult } from '../types';
 
-// Analyze emotion data and return analysis result
-export const analyzeEmotion = async (data: EmotionData): Promise<EmotionAnalysisResult> => {
-  // This is a simplified emotion analysis algorithm
-  // In a real app, this could be more sophisticated or use a machine learning model
-  
-  // Calculate emotion scores based on the input parameters
-  const emotionScores = calculateEmotionScores(data);
-  
+/**
+ * Analyzes emotion data and returns an analysis result
+ * @param emotions The emotion data to analyze
+ * @returns An analysis result with the dominant emotion and confidence
+ */
+export const analyzeEmotions = (emotions: EmotionData): EmotionAnalysisResult => {
   // Find the dominant emotion (highest score)
-  const dominantEmotion = Object.entries(emotionScores)
-    .reduce((max, [emotion, score]) => score > max.score ? { emotion, score } : max, { emotion: 'neutral', score: 0 })
-    .emotion;
+  let dominantEmotion: keyof EmotionData = 'neutral';
+  let highestScore = 0;
   
-  // Calculate overall emotional intensity (0-100)
-  const intensity = calculateIntensity(data);
+  // Check each emotion
+  Object.entries(emotions).forEach(([emotion, score]) => {
+    if (score > highestScore) {
+      highestScore = score;
+      dominantEmotion = emotion as keyof EmotionData;
+    }
+  });
   
-  // Generate a description of the emotional state
-  const description = generateDescription(dominantEmotion, intensity);
+  // Calculate confidence (normalized score of dominant emotion)
+  const totalScore = Object.values(emotions).reduce((sum, score) => sum + score, 0);
+  const confidence = totalScore > 0 ? highestScore / totalScore : 0;
   
   return {
+    emotions,
     dominantEmotion,
-    emotionScores,
-    intensity,
-    description,
+    confidence,
+    timestamp: Date.now()
   };
 };
 
-// Calculate emotion scores based on the input parameters
-const calculateEmotionScores = (data: EmotionData): Record<string, number> => {
-  const { energy, calmness, tension } = data;
+/**
+ * Analyzes text for emotional content
+ * @param text The text to analyze
+ * @returns Emotion data based on the text
+ */
+export const analyzeText = (text: string): EmotionData => {
+  // This is a placeholder implementation
+  // In a real app, this would use NLP or an emotion analysis API
   
-  // Convert slider values to emotion scores
-  // This is a simplified mapping - a real implementation could be more nuanced
-  return {
-    joy: normalizeScore((energy * 0.7) + (calmness * 0.3) - (tension * 0.5)),
-    contentment: normalizeScore((calmness * 0.8) - (energy * 0.2) - (tension * 0.6)),
-    anger: normalizeScore((tension * 0.8) + (energy * 0.4) - (calmness * 0.8)),
-    sadness: normalizeScore((tension * 0.4) - (energy * 0.8) + (calmness * 0.1)),
-    fear: normalizeScore((tension * 0.7) - (calmness * 0.7) + (energy * 0.1)),
-    surprise: normalizeScore((energy * 0.6) + (tension * 0.3) - (calmness * 0.2)),
-    disgust: normalizeScore((tension * 0.5) - (calmness * 0.5) - (energy * 0.2)),
-    neutral: normalizeScore(100 - Math.max(energy, calmness, tension)),
-  };
-};
-
-// Calculate overall emotional intensity
-const calculateIntensity = (data: EmotionData): number => {
-  const { energy, tension } = data;
-  return Math.min(100, Math.max(0, (energy * 0.6) + (tension * 0.4)));
-};
-
-// Generate a description of the emotional state
-const generateDescription = (emotion: string, intensity: number): string => {
-  const intensityLevel = intensity < 30 ? 'mild' : intensity < 70 ? 'moderate' : 'strong';
-  
-  const descriptions: Record<string, Record<string, string>> = {
-    joy: {
-      mild: 'You seem to be feeling a bit of happiness.',
-      moderate: 'You appear to be in a good mood.',
-      strong: 'You seem to be experiencing intense joy!',
-    },
-    contentment: {
-      mild: 'You seem to be feeling slightly at ease.',
-      moderate: 'You appear to be feeling content and peaceful.',
-      strong: 'You seem to be experiencing deep contentment and serenity.',
-    },
-    anger: {
-      mild: 'You seem to be feeling a bit irritated.',
-      moderate: 'You appear to be feeling frustrated or annoyed.',
-      strong: 'You seem to be experiencing strong anger.',
-    },
-    sadness: {
-      mild: 'You seem to be feeling a touch of sadness.',
-      moderate: 'You appear to be feeling down or blue.',
-      strong: 'You seem to be experiencing deep sadness.',
-    },
-    fear: {
-      mild: 'You seem to be feeling slightly anxious.',
-      moderate: 'You appear to be feeling worried or nervous.',
-      strong: 'You seem to be experiencing significant fear or anxiety.',
-    },
-    surprise: {
-      mild: 'You seem to be feeling a bit surprised.',
-      moderate: 'You appear to be feeling astonished.',
-      strong: 'You seem to be experiencing shock or amazement.',
-    },
-    disgust: {
-      mild: 'You seem to be feeling slightly put off.',
-      moderate: 'You appear to be feeling disgusted.',
-      strong: 'You seem to be experiencing strong revulsion.',
-    },
-    neutral: {
-      mild: 'Your emotions seem balanced.',
-      moderate: 'You appear to be in a neutral state.',
-      strong: 'You seem to be in a very balanced emotional state.',
-    },
+  const emotions: EmotionData = {
+    joy: 0,
+    sadness: 0,
+    anger: 0,
+    fear: 0,
+    surprise: 0,
+    disgust: 0,
+    contentment: 0,
+    neutral: 1 // Default to neutral
   };
   
-  return descriptions[emotion]?.[intensityLevel] || 'Your emotional state is unclear.';
+  // Simple keyword matching
+  const keywords = {
+    joy: ['happy', 'joy', 'excited', 'great', 'wonderful', 'love', 'pleased'],
+    sadness: ['sad', 'unhappy', 'depressed', 'down', 'miserable', 'upset'],
+    anger: ['angry', 'mad', 'furious', 'annoyed', 'irritated', 'frustrated'],
+    fear: ['afraid', 'scared', 'fearful', 'terrified', 'anxious', 'worried'],
+    surprise: ['surprised', 'shocked', 'amazed', 'astonished', 'unexpected'],
+    disgust: ['disgusted', 'gross', 'revolting', 'awful', 'horrible'],
+    contentment: ['content', 'satisfied', 'peaceful', 'calm', 'relaxed']
+  };
+  
+  const lowercaseText = text.toLowerCase();
+  
+  // Count keyword matches for each emotion
+  let totalMatches = 0;
+  Object.entries(keywords).forEach(([emotion, words]) => {
+    const emotionKey = emotion as keyof typeof keywords;
+    const matches = words.filter(word => lowercaseText.includes(word)).length;
+    
+    if (matches > 0) {
+      emotions[emotionKey] = matches;
+      totalMatches += matches;
+      emotions.neutral = 0; // If we found any emotion, reduce neutral
+    }
+  });
+  
+  // Normalize scores
+  if (totalMatches > 0) {
+    Object.keys(emotions).forEach(key => {
+      const emotionKey = key as keyof EmotionData;
+      emotions[emotionKey] = emotions[emotionKey] / totalMatches;
+    });
+  }
+  
+  return emotions;
 };
 
-// Normalize a score to be between 0 and 1
-const normalizeScore = (value: number): number => {
-  return Math.max(0, Math.min(1, value / 100));
+/**
+ * Creates a description of the emotional state
+ * @param result The emotion analysis result
+ * @returns A text description of the emotional state
+ */
+export const createEmotionDescription = (result: EmotionAnalysisResult): string => {
+  const { dominantEmotion, confidence } = result;
+  
+  // Confidence level descriptions
+  let intensityDesc = 'slightly';
+  if (confidence > 0.7) {
+    intensityDesc = 'extremely';
+  } else if (confidence > 0.5) {
+    intensityDesc = 'very';
+  } else if (confidence > 0.3) {
+    intensityDesc = 'moderately';
+  }
+  
+  // Generate description based on dominant emotion
+  switch (dominantEmotion) {
+    case 'joy':
+      return `You are feeling ${intensityDesc} happy and joyful.`;
+    case 'sadness':
+      return `You are feeling ${intensityDesc} sad.`;
+    case 'anger':
+      return `You are feeling ${intensityDesc} angry.`;
+    case 'fear':
+      return `You are feeling ${intensityDesc} afraid or anxious.`;
+    case 'surprise':
+      return `You are feeling ${intensityDesc} surprised.`;
+    case 'disgust':
+      return `You are feeling ${intensityDesc} disgusted.`;
+    case 'contentment':
+      return `You are feeling ${intensityDesc} content and at ease.`;
+    case 'neutral':
+    default:
+      return 'Your emotional state appears to be neutral.';
+  }
 }; 
