@@ -12,13 +12,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, typography } from '../constants/theme';
+import colors from '../constants/theme';
+import spacing from '../constants/theme';
+import typography from '../constants/theme';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { EmotionSlider } from '../components/ui/EmotionSlider';
 import { DrawingCanvas } from '../components/ui/DrawingCanvas';
 import { VoiceRecorder } from '../components/ui/VoiceRecorder';
 import { FaceCamera } from '../components/ui/FaceCamera';
-import { analyzeEmotion } from '../services/emotionAnalysis';
+import { analyzeEmotions } from '../services/emotionAnalysis';
 import { EmotionData, EmotionAnalysisResult } from '../types';
 import { FaceAnalysisResult, integrateEmotionData } from '../services/faceAnalysis';
 
@@ -77,7 +79,7 @@ export const EmotionInputScreen: React.FC = () => {
     
     try {
       // Analyze emotion data
-      const analysisResult = await analyzeEmotion(emotionData);
+      const analysisResult = await analyzeEmotions(emotionData);
       
       // Navigate to visualization screen
       navigation.navigate('MoodVisualization', {
@@ -298,7 +300,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: typography.fontSizes.lg,
-    fontWeight: 700,
+    fontWeight: '700',
     color: colors.text,
   },
   tabContainer: {
@@ -322,11 +324,11 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSizes.sm,
     color: colors.textLight,
     marginTop: 2,
-    fontWeight: 400,
+    fontWeight: '400',
   },
   activeTabText: {
     color: colors.primary,
-    fontWeight: 500,
+    fontWeight: '500',
   },
   content: {
     flex: 1,
@@ -352,13 +354,13 @@ const styles = StyleSheet.create({
   },
   detectedEmotionTitle: {
     fontSize: typography.fontSizes.md,
-    fontWeight: 500,
+    fontWeight: '500',
     color: colors.text,
     marginBottom: spacing.xs,
   },
   detectedEmotionText: {
     fontSize: typography.fontSizes.lg,
-    fontWeight: 700,
+    fontWeight: '700',
     color: colors.primary,
     marginBottom: spacing.md,
   },
@@ -409,6 +411,6 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: '#fff',
     fontSize: typography.fontSizes.md,
-    fontWeight: 500,
+    fontWeight: '500',
   },
 }); 
