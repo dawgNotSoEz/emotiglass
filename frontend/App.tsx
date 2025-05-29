@@ -38,19 +38,55 @@ const initializeDirectories = async () => {
     const rootDir = FileSystem.documentDirectory;
     const dirs = ['drawings', 'mood_entries', 'voice_recordings'];
     
+    console.log(`App documentDirectory: ${rootDir}`);
+    
     for (const dir of dirs) {
       const dirPath = `${rootDir}${dir}`;
-      const dirInfo = await FileSystem.getInfoAsync(dirPath);
+      console.log(`Initializing directory: ${dirPath}`);
       
-      if (!dirInfo.exists) {
-        console.log(`Creating directory: ${dirPath}`);
-        await FileSystem.makeDirectoryAsync(dirPath, { intermediates: true });
+      try {
+        const dirInfo = await FileSystem.getInfoAsync(dirPath);
+        
+        if (!dirInfo.exists) {
+          console.log(`Creating directory: ${dirPath}`);
+          await FileSystem.makeDirectoryAsync(dirPath, { intermediates: true });
+          
+          // Verify directory was created
+          const verifyInfo = await FileSystem.getInfoAsync(dirPath);
+          if (!verifyInfo.exists) {
+            console.error(`Failed to create directory: ${dirPath}`);
+            return false;
+          }
+          
+          console.log(`Directory created successfully: ${dirPath}`);
+        } else {
+          console.log(`Directory already exists: ${dirPath}`);
+        }
+        
+        // Test directory is writable
+        const testFile = `${dirPath}/test_${Date.now()}.txt`;
+        await FileSystem.writeAsStringAsync(testFile, 'test');
+        await FileSystem.deleteAsync(testFile, { idempotent: true });
+        console.log(`Directory is writable: ${dirPath}`);
+      } catch (dirError) {
+        console.error(`Error handling directory ${dirPath}:`, dirError);
+        Alert.alert(
+          'Storage Error',
+          `Unable to access or create directory: ${dir}. Some features may not work correctly.`,
+          [{ text: 'OK' }]
+        );
+        return false;
       }
     }
     
     return true;
   } catch (error) {
     console.error('Error initializing directories:', error);
+    Alert.alert(
+      'Storage Error',
+      'Unable to initialize storage directories. Some features may not work correctly.',
+      [{ text: 'OK' }]
+    );
     return false;
   }
 };
