@@ -28,14 +28,17 @@ export interface TrendAnalysisResult {
  * @param entries Array of mood entries to analyze
  * @returns Analysis of trends in the data
  */
-export const analyzeTrends = (entries: MoodEntry[]) => {
+export const analyzeTrends = (entries: MoodEntry[]): TrendAnalysisResult => {
   if (entries.length === 0) {
     return {
-      dominantEmotion: 'neutral',
-      emotionDistribution: {},
-      timeOfDayDistribution: {},
-      weekdayDistribution: {},
-      emotionParameters: {},
+      trends: {
+        energy: { label: 'Energy', data: [], color: '#3498db' },
+        calmness: { label: 'Calmness', data: [], color: '#2ecc71' },
+        tension: { label: 'Tension', data: [], color: '#e74c3c' }
+      },
+      emotionFrequency: {},
+      timeOfDay: {},
+      dayOfWeek: {},
       insights: []
     };
   }
@@ -61,7 +64,10 @@ export const analyzeTrends = (entries: MoodEntry[]) => {
     emotionDistribution,
     timeOfDayDistribution,
     weekdayDistribution
-  );
+  ).map(text => ({
+    type: determineInsightType(text),
+    text
+  }));
   
   // Find overall dominant emotion
   const dominantEmotion = Object.entries(emotionDistribution)
@@ -70,12 +76,30 @@ export const analyzeTrends = (entries: MoodEntry[]) => {
       { emotion: 'neutral', count: 0 }
     ).emotion;
   
+  // Create trend data
+  const trends = {
+    energy: {
+      label: 'Energy',
+      data: sortedEntries.map(entry => entry.emotions.energy || 50),
+      color: '#3498db'
+    },
+    calmness: {
+      label: 'Calmness',
+      data: sortedEntries.map(entry => entry.emotions.calmness || 50),
+      color: '#2ecc71'
+    },
+    tension: {
+      label: 'Tension',
+      data: sortedEntries.map(entry => entry.emotions.tension || 50),
+      color: '#e74c3c'
+    }
+  };
+  
   return {
-    dominantEmotion,
-    emotionDistribution,
-    timeOfDayDistribution,
-    weekdayDistribution,
-    emotionParameters,
+    trends,
+    emotionFrequency: emotionDistribution,
+    timeOfDay: timeOfDayDistribution,
+    dayOfWeek: weekdayDistribution,
     insights
   };
 };
@@ -254,6 +278,24 @@ const generateInsights = (
   }
   
   return insights;
+};
+
+/**
+ * Determine the type of insight based on its content
+ */
+const determineInsightType = (text: string): 'positive' | 'neutral' | 'negative' => {
+  const positiveWords = ['positive', 'improving', 'better', 'joy', 'contentment', 'happy'];
+  const negativeWords = ['negative', 'declining', 'worse', 'sad', 'anger', 'fear', 'disgust'];
+  
+  const lowerText = text.toLowerCase();
+  
+  if (positiveWords.some(word => lowerText.includes(word))) {
+    return 'positive';
+  } else if (negativeWords.some(word => lowerText.includes(word))) {
+    return 'negative';
+  }
+  
+  return 'neutral';
 };
 
 // Helper function to capitalize first letter
