@@ -1,9 +1,12 @@
 import * as SecureStore from 'expo-secure-store';
 import * as FileSystem from 'expo-file-system';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MoodEntry } from '../types';
 
 const MOOD_ENTRIES_KEY = 'emotiglass_mood_entries';
 const MOOD_ENTRIES_DIR = FileSystem.documentDirectory + 'mood_entries/';
+
+export { MoodEntry };
 
 // Initialize storage
 export const initStorage = async (): Promise<boolean> => {
