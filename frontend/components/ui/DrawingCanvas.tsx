@@ -17,16 +17,30 @@ interface DrawingCanvasProps {
 const DRAWINGS_DIR = FileSystem.documentDirectory + 'drawings/';
 
 // Ensure directory exists
-const ensureDirectoryExists = async (directory: string): Promise<void> => {
+const ensureDirectoryExists = async (directory: string): Promise<boolean> => {
   try {
+    console.log(`Checking if directory exists: ${directory}`);
     const dirInfo = await FileSystem.getInfoAsync(directory);
+    
     if (!dirInfo.exists) {
       console.log(`Creating directory: ${directory}`);
       await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+      
+      // Verify directory was created
+      const verifyInfo = await FileSystem.getInfoAsync(directory);
+      if (!verifyInfo.exists) {
+        console.error(`Failed to create directory: ${directory}`);
+        return false;
+      }
+      console.log(`Directory created successfully: ${directory}`);
+    } else {
+      console.log(`Directory already exists: ${directory}`);
     }
+    
+    return true;
   } catch (error) {
     console.error(`Error ensuring directory exists: ${directory}`, error);
-    // Don't throw error here, just log it
+    return false;
   }
 };
 
@@ -41,6 +55,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   const [currentWidth, setCurrentWidth] = useState(3);
   const [previewMode, setPreviewMode] = useState(false);
   const [directoryReady, setDirectoryReady] = useState(false);
+  const [isDrawing, setIsDrawing] = useState(false);
   
   // Available colors
   const colorOptions = [
@@ -65,8 +80,19 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   useEffect(() => {
     const initDirectory = async () => {
       try {
-        await ensureDirectoryExists(DRAWINGS_DIR);
-        setDirectoryReady(true);
+        console.log('Initializing drawing directory...');
+        const success = await ensureDirectoryExists(DRAWINGS_DIR);
+        if (success) {
+          console.log('Drawing directory initialized successfully');
+          setDirectoryReady(true);
+        } else {
+          console.error('Failed to initialize drawing directory');
+          Alert.alert(
+            'Storage Error',
+            'Unable to access storage for saving drawings. Drawing functionality may be limited.',
+            [{ text: 'OK' }]
+          );
+        }
       } catch (error) {
         console.error('Failed to initialize drawing directory:', error);
         Alert.alert(
@@ -83,6 +109,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   // Notify parent when drawing changes
   useEffect(() => {
     if (paths.length > 0) {
+      console.log(`Drawing updated - ${paths.length} paths`);
       const drawingData = JSON.stringify(paths);
       onDrawingComplete(drawingData);
     }
@@ -91,12 +118,19 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   // Pan responder for touch handling
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !previewMode,
-      onMoveShouldSetPanResponder: () => !previewMode,
+      onStartShouldSetPanResponder: () => {
+        console.log(`onStartShouldSetPanResponder - previewMode: ${previewMode}`);
+        return !previewMode;
+      },
+      onMoveShouldSetPanResponder: () => {
+        return !previewMode;
+      },
       onPanResponderGrant: (event) => {
         if (previewMode) return;
         
         const { locationX, locationY } = event.nativeEvent;
+        console.log(`Starting drawing at: ${locationX}, ${locationY}`);
+        setIsDrawing(true);
         
         // Start a new path
         const newPath: DrawingPath = {
@@ -121,6 +155,9 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       onPanResponderRelease: () => {
         if (!currentPath || previewMode) return;
         
+        console.log(`Finished drawing path with ${currentPath.points.length} points`);
+        setIsDrawing(false);
+        
         // Add the completed path to the paths array
         setPaths([...paths, currentPath]);
         setCurrentPath(null);
@@ -144,6 +181,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
             setPaths([]);
             setCurrentPath(null);
             onDrawingComplete('[]');
+            console.log('Canvas cleared');
           }
         }
       ]
@@ -156,11 +194,13 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     
     const newPaths = paths.slice(0, -1);
     setPaths(newPaths);
+    console.log(`Undid last path, ${newPaths.length} paths remaining`);
   };
   
   // Toggle preview mode
   const togglePreviewMode = () => {
     setPreviewMode(!previewMode);
+    console.log(`Preview mode: ${!previewMode}`);
   };
   
   // Save drawing to file
@@ -180,13 +220,21 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       const fileName = `drawing_${Date.now()}.json`;
       const fileUri = `${DRAWINGS_DIR}${fileName}`;
       
+      console.log(`Attempting to save drawing to: ${fileUri}`);
+      
       // Ensure directory exists again just to be safe
-      await ensureDirectoryExists(DRAWINGS_DIR);
+      const dirExists = await ensureDirectoryExists(DRAWINGS_DIR);
+      if (!dirExists) {
+        console.error('Could not ensure drawings directory exists');
+        Alert.alert('Error', 'Failed to access storage for saving. Please try again.');
+        return;
+      }
       
       // Save the drawing data
       const drawingData = JSON.stringify(paths);
       await FileSystem.writeAsStringAsync(fileUri, drawingData);
       
+      console.log(`Drawing saved successfully to: ${fileUri}`);
       Alert.alert('Success', 'Drawing saved successfully');
     } catch (error) {
       console.error('Error saving drawing:', error);
@@ -291,6 +339,12 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         {!directoryReady && (
           <View style={styles.initializingOverlay}>
             <Text style={styles.initializingText}>Initializing drawing tools...</Text>
+          </View>
+        )}
+        
+        {isDrawing && (
+          <View style={styles.drawingIndicator}>
+            <Text style={styles.drawingIndicatorText}>Drawing...</Text>
           </View>
         )}
       </View>
@@ -483,5 +537,18 @@ const styles = StyleSheet.create({
     color: themeColors.textLight,
     fontSize: typography.fontSizes.md,
     fontWeight: typography.fontWeights.medium,
+  },
+  drawingIndicator: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  drawingIndicatorText: {
+    color: '#fff',
+    fontSize: typography.fontSizes.sm,
   }
 }); 
