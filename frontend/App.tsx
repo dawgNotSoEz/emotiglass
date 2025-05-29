@@ -2,46 +2,73 @@ import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from './navigation/AppNavigator';
-import 'react-native-gesture-handler';
-import fixNativeModules from './utils/NativeModulesFix';
-import { LogBox } from 'react-native';
+import { LogBox, Text, View } from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Constants from 'expo-constants';
 
-// Ignore specific warnings that might be related to our fixes
+// Keep the splash screen visible while we initialize the app
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* ignore error */
+});
+
+// Ignore specific warnings
 LogBox.ignoreLogs([
   'Warning: ...',
-  'Cannot read property \'getConstants\' of undefined',
+  'Cannot read property',
+  'Non-serializable values were found in the navigation state',
 ]);
 
-// Apply native module fixes as early as possible
-if (typeof global !== 'undefined') {
-  fixNativeModules();
+// Ensure native modules are available globally
+if (typeof global !== 'undefined' && !global.Expo) {
+  global.Expo = {
+    Constants: Constants || {},
+  };
 }
 
 export default function App() {
-  // Also apply fixes when the component mounts
+  // Handle errors in the app
+  const [isReady, setIsReady] = React.useState(false);
+  const [error, setError] = React.useState<Error | null>(null);
+
   useEffect(() => {
-    try {
-      fixNativeModules();
-    } catch (error) {
-      console.warn('Error applying native module fixes:', error);
-    }
-    
-    // Re-apply after a short delay to catch any late-initialized modules
-    const timer = setTimeout(() => {
+    async function prepare() {
       try {
-        fixNativeModules();
-      } catch (error) {
-        console.warn('Error in delayed native module fixes:', error);
+        // Pre-load any assets or data here
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (e) {
+        console.warn('Error loading app:', e);
+        setError(e as Error);
+      } finally {
+        setIsReady(true);
+        await SplashScreen.hideAsync();
       }
-    }, 1000);
-    
-    return () => clearTimeout(timer);
+    }
+
+    prepare();
   }, []);
 
+  if (!isReady) {
+    return null; // Still showing splash screen
+  }
+
+  if (error) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <Text style={{ fontSize: 18, color: 'red', marginBottom: 10 }}>
+          Error loading app:
+        </Text>
+        <Text style={{ fontSize: 14 }}>{error.message}</Text>
+      </View>
+    );
+  }
+
   return (
-    <SafeAreaProvider>
-      <AppNavigator />
-      <StatusBar style="auto" />
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <AppNavigator />
+        <StatusBar style="auto" />
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 } 
