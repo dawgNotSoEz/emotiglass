@@ -65,7 +65,7 @@ export const getAllMoodEntries = async (): Promise<MoodEntry[]> => {
     }
     
     // Sort by date (newest first)
-    return entries.sort((a, b) => b.createdAt - a.createdAt);
+    return entries.sort((a, b) => b.timestamp - a.timestamp);
   } catch (error) {
     console.error('Failed to get mood entries:', error);
     return [];
