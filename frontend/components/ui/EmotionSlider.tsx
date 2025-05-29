@@ -73,6 +73,9 @@ export const EmotionSlider: React.FC<EmotionSliderProps> = ({
     position.setValue(valueToPosition(value));
   }, [value, sliderWidth]);
   
+  // Calculate the percentage for rendering (not animation)
+  const percentage = ((value - min) / (max - min)) * 100;
+  
   // Pan responder for handling gestures
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
@@ -102,13 +105,6 @@ export const EmotionSlider: React.FC<EmotionSliderProps> = ({
     }
   });
   
-  // Interpolate position to width
-  const width_interpolated = position.interpolate({
-    inputRange: [0, sliderWidth],
-    outputRange: [0, sliderWidth],
-    extrapolate: 'clamp'
-  });
-  
   return (
     <View style={[styles.container, style]}>
       <Text style={[styles.label, labelStyle]}>{label}</Text>
@@ -131,13 +127,13 @@ export const EmotionSlider: React.FC<EmotionSliderProps> = ({
           />
         </View>
         
-        {/* Active track */}
-        <Animated.View 
+        {/* Active track - using a non-animated View for the fill */}
+        <View 
           style={[
             styles.activeTrack,
             { 
-              width: width_interpolated,
-              backgroundColor: minimumTrackTintColor
+              backgroundColor: minimumTrackTintColor,
+              width: `${percentage}%`,
             }
           ]}
         />
@@ -199,7 +195,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     height: TRACK_HEIGHT,
     borderRadius: TRACK_HEIGHT / 2,
-    backgroundColor: theme.colors.primary,
     left: 0,
     top: (THUMB_SIZE - TRACK_HEIGHT) / 2,
   },
