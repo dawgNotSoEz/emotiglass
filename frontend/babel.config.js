@@ -8,10 +8,18 @@ module.exports = function(api) {
         {
           root: ['./'],
           alias: {
-            '@': './',
+            '@components': './components',
+            '@screens': './screens',
+            '@utils': './utils',
+            '@services': './services',
+            '@constants': './constants',
+            '@assets': './assets',
+            '@hooks': './hooks',
+            '@navigation': './navigation',
           },
         },
       ],
+      'react-native-reanimated/plugin',
     ],
   };
 }; 

@@ -11,9 +11,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, typography } from '../constants/theme';
-import { RootStackParamList } from '../navigation/AppNavigator';
-import { getAllMoodEntries, MoodEntry, deleteMoodEntry } from '../services/storage';
+import theme from '../constants/theme';
+import { getAllMoodEntries, deleteMoodEntry } from '../services/storage';
+import { MoodEntry, RootStackParamList } from '../types';
 
 type MoodDiaryScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MoodDiary'>;
 
@@ -57,23 +57,23 @@ export const MoodDiaryScreen: React.FC = () => {
   };
 
   const renderItem = ({ item }: { item: MoodEntry }) => {
-    const date = new Date(item.createdAt);
+    const date = new Date(item.timestamp);
     const formattedDate = `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     
     // Get a color based on the dominant emotion
-    const emotionColor = getEmotionColor(item.analysis.dominantEmotion);
+    const emotionColor = getEmotionColor(item.dominantEmotion);
     
     return (
       <View style={styles.entryCard}>
         <View style={[styles.emotionIndicator, { backgroundColor: emotionColor }]} />
         <View style={styles.entryContent}>
-          <Text style={styles.emotionText}>{item.analysis.dominantEmotion.toUpperCase()}</Text>
+          <Text style={styles.emotionText}>{item.dominantEmotion.toUpperCase()}</Text>
           <Text style={styles.dateText}>{formattedDate}</Text>
           
           <View style={styles.entryStats}>
-            <Text style={styles.statText}>Energy: {Math.round(item.emotionData.energy)}%</Text>
-            <Text style={styles.statText}>Calmness: {Math.round(item.emotionData.calmness)}%</Text>
-            <Text style={styles.statText}>Tension: {Math.round(item.emotionData.tension)}%</Text>
+            <Text style={styles.statText}>Energy: {Math.round(item.emotions.energy)}%</Text>
+            <Text style={styles.statText}>Calmness: {Math.round(item.emotions.calmness)}%</Text>
+            <Text style={styles.statText}>Tension: {Math.round(item.emotions.tension)}%</Text>
           </View>
         </View>
         
@@ -81,7 +81,7 @@ export const MoodDiaryScreen: React.FC = () => {
           style={styles.deleteButton}
           onPress={() => handleDeleteEntry(item.id)}
         >
-          <Ionicons name="trash-outline" size={20} color={colors.error} />
+          <Ionicons name="trash-outline" size={20} color={theme.colors.error} />
         </TouchableOpacity>
       </View>
     );
@@ -94,18 +94,18 @@ export const MoodDiaryScreen: React.FC = () => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Mood Diary</Text>
       </View>
       
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       ) : entries.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="journal-outline" size={64} color={colors.textLight} />
+          <Ionicons name="journal-outline" size={64} color={theme.colors.textLight} />
           <Text style={styles.emptyText}>No mood entries yet</Text>
           <TouchableOpacity
             style={styles.createButton}
@@ -141,28 +141,28 @@ const getEmotionColor = (emotion: string): string => {
     neutral: '#A9A9A9',
   };
   
-  return emotionColors[emotion] || colors.primary;
+  return emotionColors[emotion] || theme.colors.primary;
 };
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
+    padding: theme.spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: theme.colors.border,
   },
   backButton: {
-    marginRight: spacing.md,
+    marginRight: theme.spacing.md,
   },
   headerTitle: {
-    fontSize: typography.fontSizes.lg,
-    fontWeight: typography.fontWeights.bold,
-    color: colors.text,
+    fontSize: theme.typography.fontSizes.lg,
+    fontWeight: '700',
+    color: theme.colors.text,
   },
   loadingContainer: {
     flex: 1,
@@ -170,13 +170,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContent: {
-    padding: spacing.md,
+    padding: theme.spacing.md,
   },
   entryCard: {
     flexDirection: 'row',
     backgroundColor: '#fff',
     borderRadius: 8,
-    marginBottom: spacing.md,
+    marginBottom: theme.spacing.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -190,31 +190,31 @@ const styles = StyleSheet.create({
   },
   entryContent: {
     flex: 1,
-    padding: spacing.md,
+    padding: theme.spacing.md,
   },
   emotionText: {
-    fontSize: typography.fontSizes.md,
-    fontWeight: typography.fontWeights.bold,
-    color: colors.text,
-    marginBottom: spacing.xs,
+    fontSize: theme.typography.fontSizes.md,
+    fontWeight: theme.typography.fontWeights.bold,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
   },
   dateText: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.textLight,
-    marginBottom: spacing.sm,
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textLight,
+    marginBottom: theme.spacing.sm,
   },
   entryStats: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
   statText: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.text,
-    marginRight: spacing.md,
-    marginBottom: spacing.xs,
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.text,
+    marginRight: theme.spacing.md,
+    marginBottom: theme.spacing.xs,
   },
   deleteButton: {
-    padding: spacing.md,
+    padding: theme.spacing.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -222,23 +222,23 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.lg,
+    padding: theme.spacing.lg,
   },
   emptyText: {
-    fontSize: typography.fontSizes.lg,
-    color: colors.textLight,
-    marginTop: spacing.md,
-    marginBottom: spacing.lg,
+    fontSize: theme.typography.fontSizes.lg,
+    color: theme.colors.textLight,
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
   },
   createButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
     borderRadius: 8,
   },
   createButtonText: {
     color: '#fff',
-    fontSize: typography.fontSizes.md,
-    fontWeight: typography.fontWeights.medium,
+    fontSize: theme.typography.fontSizes.md,
+    fontWeight: theme.typography.fontWeights.medium,
   },
 }); 
