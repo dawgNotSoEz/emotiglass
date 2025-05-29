@@ -24,22 +24,29 @@ export const MoodAnalysisScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [trendData, setTrendData] = useState<TrendAnalysisResult | null>(null);
   const [timeRange, setTimeRange] = useState<7 | 30 | 90>(7); // 7 days, 30 days, or 90 days
+  const [entries, setEntries] = useState([]);
+  const [noDataMessage, setNoDataMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   
   useEffect(() => {
     loadData();
   }, [timeRange]);
   
   const loadData = async () => {
-    setLoading(true);
     try {
-      // Get all mood entries
+      setLoading(true);
       const entries = await getAllMoodEntries();
       
-      // Analyze trends
-      const analysis = analyzeTrends(entries, timeRange);
-      setTrendData(analysis);
+      if (entries.length > 0) {
+        setEntries(entries);
+        const analysis = analyzeTrends(entries);
+        setTrendData(analysis);
+      } else {
+        setNoDataMessage('No mood entries found. Start recording your emotions to see trends.');
+      }
     } catch (error) {
-      console.error('Failed to load mood analysis:', error);
+      console.error('Error loading mood data:', error);
+      setErrorMessage('Failed to load mood data. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -119,8 +126,7 @@ export const MoodAnalysisScreen: React.FC = () => {
         <View style={styles.emptyContainer}>
           <Ionicons name="analytics-outline" size={64} color={colors.textLight} />
           <Text style={styles.emptyText}>
-            Not enough data for analysis.{'\n'}
-            Record more emotions to see trends.
+            {noDataMessage || errorMessage}
           </Text>
           <TouchableOpacity
             style={styles.createButton}
