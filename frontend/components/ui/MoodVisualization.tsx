@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import { Audio } from 'expo-av';
 import { EmotionAnalysisResult } from '../../types';
-import { EmotionParticles } from '../visualizations/EmotionParticles';
+import { EmotionParticles } from '../visualizations/SimpleEmotionParticles';
 import { EmotionWaves } from '../visualizations/EmotionWaves';
 
 interface MoodVisualizationProps {
