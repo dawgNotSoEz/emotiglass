@@ -13,7 +13,7 @@ const PlatformConstants = {
   
   // Expo specific constants
   expoVersion: Constants.expoVersion,
-  appVersion: Constants.manifest?.version || '1.0.0',
+  appVersion: Constants.expoConfig?.version || '1.0.0',
   
   // Device information
   deviceName: Constants.deviceName,
