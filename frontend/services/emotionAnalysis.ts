@@ -12,21 +12,32 @@ export const analyzeEmotions = (emotions: EmotionData): EmotionAnalysisResult =>
   
   // Check each emotion
   Object.entries(emotions).forEach(([emotion, score]) => {
-    if (score > highestScore) {
+    if (emotion !== 'energy' && emotion !== 'calmness' && emotion !== 'tension' && score > highestScore) {
       highestScore = score;
       dominantEmotion = emotion as keyof EmotionData;
     }
   });
   
   // Calculate confidence (normalized score of dominant emotion)
-  const totalScore = Object.values(emotions).reduce((sum, score) => sum + score, 0);
+  const emotionScores = Object.entries(emotions)
+    .filter(([key]) => !['energy', 'calmness', 'tension'].includes(key))
+    .map(([_, score]) => score);
+  
+  const totalScore = emotionScores.reduce((sum, score) => sum + score, 0);
   const confidence = totalScore > 0 ? highestScore / totalScore : 0;
+  
+  // Calculate intensity based on dominant emotion and energy
+  const intensity = Math.min(100, Math.max(0, 
+    emotions.energy * 0.4 + 
+    (emotions[dominantEmotion] * 100) * 0.6
+  ));
   
   return {
     emotions,
     dominantEmotion,
     confidence,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    intensity
   };
 };
 
@@ -47,7 +58,10 @@ export const analyzeText = (text: string): EmotionData => {
     surprise: 0,
     disgust: 0,
     contentment: 0,
-    neutral: 1 // Default to neutral
+    neutral: 1, // Default to neutral
+    energy: 50, // Default energy level
+    calmness: 50, // Default calmness level
+    tension: 50 // Default tension level
   };
   
   // Simple keyword matching
@@ -80,8 +94,20 @@ export const analyzeText = (text: string): EmotionData => {
   if (totalMatches > 0) {
     Object.keys(emotions).forEach(key => {
       const emotionKey = key as keyof EmotionData;
-      emotions[emotionKey] = emotions[emotionKey] / totalMatches;
+      if (emotionKey !== 'energy' && emotionKey !== 'calmness' && emotionKey !== 'tension') {
+        emotions[emotionKey] = emotions[emotionKey] / totalMatches;
+      }
     });
+    
+    // Adjust energy, calmness, and tension based on emotions
+    emotions.energy = 50 + (emotions.joy + emotions.anger + emotions.surprise - emotions.sadness) * 25;
+    emotions.calmness = 50 + (emotions.contentment - emotions.anger - emotions.fear) * 25;
+    emotions.tension = 50 + (emotions.fear + emotions.anger - emotions.contentment) * 25;
+    
+    // Ensure values are within range
+    emotions.energy = Math.min(100, Math.max(0, emotions.energy));
+    emotions.calmness = Math.min(100, Math.max(0, emotions.calmness));
+    emotions.tension = Math.min(100, Math.max(0, emotions.tension));
   }
   
   return emotions;
