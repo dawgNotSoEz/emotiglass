@@ -6,7 +6,7 @@ import { MoodEntry } from '../types';
 const MOOD_ENTRIES_KEY = 'emotiglass_mood_entries';
 const MOOD_ENTRIES_DIR = FileSystem.documentDirectory + 'mood_entries/';
 
-export { MoodEntry };
+export type { MoodEntry };
 
 // Initialize storage
 export const initStorage = async (): Promise<boolean> => {
