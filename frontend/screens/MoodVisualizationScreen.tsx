@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { MoodVisualization } from '../components/ui/MoodVisualization';
 import { colors, spacing, typography } from '../constants/theme';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { analyzeEmotion } from '../services/emotionAnalysis';
+import { analyzeEmotions } from '../services/emotionAnalysis';
 import { saveMoodEntry } from '../services/storage';
 import { EmotionData, EmotionAnalysisResult, MoodEntry } from '../types';
 
@@ -33,7 +33,7 @@ export const MoodVisualizationScreen: React.FC = () => {
   useEffect(() => {
     // Analyze the emotion data
     const analyzeData = async () => {
-      const analysis = await analyzeEmotion(emotionData);
+      const analysis = await analyzeEmotions(emotionData);
       setMoodAnalysis(analysis);
     };
     
@@ -101,16 +101,18 @@ export const MoodVisualizationScreen: React.FC = () => {
             {moodAnalysis.dominantEmotion.toUpperCase()}
           </Text>
           
-          <View style={styles.emotionStats}>
-            {Object.entries(moodAnalysis.emotionScores).map(([emotion, value]) => (
-              <View key={emotion} style={styles.statItem}>
-                <View 
-                  style={[
-                    styles.statBar, 
-                    { width: `${value * 100}%`, backgroundColor: getEmotionColor(emotion) }
-                  ]}
-                />
-                <Text style={styles.statLabel}>{emotion}</Text>
+          <View style={styles.emotionBars}>
+            {Object.entries(moodAnalysis.emotions).map(([emotion, value]) => (
+              <View key={emotion} style={styles.emotionBarContainer}>
+                <Text style={styles.emotionLabel}>{emotion}</Text>
+                <View style={styles.emotionBarBackground}>
+                  <View
+                    style={[
+                      styles.emotionBarFill,
+                      { width: `${value * 100}%`, backgroundColor: getEmotionColor(emotion) }
+                    ]}
+                  />
+                </View>
               </View>
             ))}
           </View>
@@ -200,23 +202,22 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 5,
   },
-  emotionStats: {
+  emotionBars: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 8,
     padding: spacing.md,
   },
-  statItem: {
+  emotionBarContainer: {
     marginBottom: spacing.sm,
   },
-  statBar: {
+  emotionBarBackground: {
     height: 8,
     borderRadius: 4,
     marginBottom: spacing.xs,
   },
-  statLabel: {
-    color: '#fff',
-    fontSize: typography.fontSizes.sm,
-    textTransform: 'capitalize',
+  emotionBarFill: {
+    height: '100%',
+    borderRadius: 4,
   },
   buttonContainer: {
     flexDirection: 'row',
