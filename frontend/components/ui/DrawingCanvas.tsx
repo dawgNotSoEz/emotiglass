@@ -24,7 +24,12 @@ const ensureDirectoryExists = async (directory: string): Promise<boolean> => {
     
     if (!dirInfo.exists) {
       console.log(`Creating directory: ${directory}`);
-      await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+      try {
+        await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+      } catch (dirError) {
+        console.error(`Error creating directory: ${directory}`, dirError);
+        return false;
+      }
       
       // Verify directory was created
       const verifyInfo = await FileSystem.getInfoAsync(directory);
@@ -56,6 +61,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   const [previewMode, setPreviewMode] = useState(false);
   const [directoryReady, setDirectoryReady] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
+  const svgRef = useRef<any>(null);
   
   // Available colors
   const colorOptions = [
@@ -106,10 +112,11 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     initDirectory();
   }, []);
 
-  // Notify parent when drawing changes
+  // Debug log path data
   useEffect(() => {
     if (paths.length > 0) {
       console.log(`Drawing updated - ${paths.length} paths`);
+      console.log(`Latest path has ${paths[paths.length-1].points.length} points and color ${paths[paths.length-1].color}`);
       const drawingData = JSON.stringify(paths);
       onDrawingComplete(drawingData);
     }
@@ -125,7 +132,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       onMoveShouldSetPanResponder: () => {
         return !previewMode;
       },
-      onPanResponderGrant: (event) => {
+      onPanResponderGrant: (event, gestureState) => {
         if (previewMode) return;
         
         const { locationX, locationY } = event.nativeEvent;
@@ -141,15 +148,19 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         
         setCurrentPath(newPath);
       },
-      onPanResponderMove: (event) => {
+      onPanResponderMove: (event, gestureState) => {
         if (!currentPath || previewMode) return;
         
         const { locationX, locationY } = event.nativeEvent;
         
         // Add point to the current path
-        setCurrentPath({
-          ...currentPath,
-          points: [...currentPath.points, { x: locationX, y: locationY }],
+        setCurrentPath(prevPath => {
+          if (!prevPath) return null;
+          
+          return {
+            ...prevPath,
+            points: [...prevPath.points, { x: locationX, y: locationY }],
+          };
         });
       },
       onPanResponderRelease: () => {
@@ -158,8 +169,14 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         console.log(`Finished drawing path with ${currentPath.points.length} points`);
         setIsDrawing(false);
         
-        // Add the completed path to the paths array
-        setPaths([...paths, currentPath]);
+        // Only add the path if it has more than one point
+        if (currentPath.points.length > 1) {
+          setPaths(prevPaths => [...prevPaths, currentPath]);
+          console.log(`Added path with color ${currentPath.color} and width ${currentPath.width}`);
+        } else {
+          console.log('Path too short, not adding');
+        }
+        
         setCurrentPath(null);
       },
     })
@@ -245,6 +262,11 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   // Create SVG path data from points
   const createSvgPath = (points: Point[]): string => {
     if (points.length === 0) return '';
+    if (points.length === 1) {
+      // For a single point, create a small circle
+      const { x, y } = points[0];
+      return `M ${x-1} ${y} a 1,1 0 1,0 2,0 a 1,1 0 1,0 -2,0`;
+    }
     
     // Start at the first point
     let path = `M ${points[0].x} ${points[0].y}`;
@@ -255,6 +277,33 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     }
     
     return path;
+  };
+  
+  // Add test paths for debugging
+  const addTestPaths = () => {
+    const testPaths: DrawingPath[] = [
+      {
+        points: [
+          { x: 50, y: 50 },
+          { x: 100, y: 100 },
+          { x: 150, y: 50 },
+          { x: 200, y: 100 }
+        ],
+        color: '#FF0000',
+        width: 5
+      },
+      {
+        points: [
+          { x: 50, y: 150 },
+          { x: 200, y: 150 }
+        ],
+        color: '#0000FF',
+        width: 10
+      }
+    ];
+    
+    setPaths([...paths, ...testPaths]);
+    console.log('Added test paths');
   };
   
   return (
@@ -273,6 +322,9 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           </TouchableOpacity>
           <TouchableOpacity onPress={saveDrawing} style={styles.toolButton}>
             <Ionicons name="save-outline" size={24} color="#333" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={addTestPaths} style={styles.toolButton}>
+            <Ionicons name="add-circle-outline" size={24} color="#333" />
           </TouchableOpacity>
         </View>
         
@@ -294,12 +346,12 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         ]}
         {...panResponder.panHandlers}
       >
-        <Svg width="100%" height="100%" style={styles.svg}>
+        <Svg width="100%" height="100%" style={styles.svg} ref={svgRef}>
           <G>
             {/* Render completed paths */}
             {paths.map((path, index) => (
               <Path
-                key={index}
+                key={`path-${index}`}
                 d={createSvgPath(path.points)}
                 stroke={path.color}
                 strokeWidth={path.width}
@@ -392,6 +444,12 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           </View>
         </View>
       )}
+      
+      {paths.length === 0 && !currentPath && (
+        <View style={styles.emptyCanvasOverlay}>
+          <Text style={styles.emptyCanvasText}>Draw here</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -404,6 +462,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: themeColors.border,
+    position: 'relative',
   },
   canvasContainer: {
     backgroundColor: '#fff',
@@ -419,6 +478,7 @@ const styles = StyleSheet.create({
   },
   svg: {
     backgroundColor: 'transparent',
+    flex: 1,
   },
   toolbarTop: {
     flexDirection: 'row',
@@ -550,5 +610,20 @@ const styles = StyleSheet.create({
   drawingIndicatorText: {
     color: '#fff',
     fontSize: typography.fontSizes.sm,
+  },
+  emptyCanvasOverlay: {
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    pointerEvents: 'none',
+  },
+  emptyCanvasText: {
+    color: 'rgba(0, 0, 0, 0.2)',
+    fontSize: typography.fontSizes.xl,
+    fontWeight: typography.fontWeights.bold,
   }
 }); 
