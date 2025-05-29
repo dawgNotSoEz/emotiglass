@@ -191,7 +191,10 @@ const calculateEmotionParameters = (entries: MoodEntry[]) => {
     surprise: 0,
     disgust: 0,
     contentment: 0,
-    neutral: 0
+    neutral: 0,
+    energy: 0,
+    calmness: 0,
+    tension: 0
   };
   
   entries.forEach(entry => {
