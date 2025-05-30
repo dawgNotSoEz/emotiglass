@@ -8,10 +8,12 @@ import {
   Dimensions,
   ViewStyle,
   StyleProp,
-  TextStyle
+  TextStyle,
+  ColorValue
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import theme from '../../constants/theme';
+import Slider from '@react-native-community/slider';
 
 interface EmotionSliderProps {
   label: string;
@@ -28,6 +30,7 @@ interface EmotionSliderProps {
   minimumTrackTintColor?: string;
   maximumTrackTintColor?: string;
   thumbTintColor?: string;
+  colorGradient?: ColorValue[];
 }
 
 const { width } = Dimensions.get('window');
@@ -48,7 +51,8 @@ export const EmotionSlider: React.FC<EmotionSliderProps> = ({
   gradientColors = theme.gradients.primary,
   minimumTrackTintColor = theme.colors.primary,
   maximumTrackTintColor = theme.colors.lightGray,
-  thumbTintColor = theme.colors.white
+  thumbTintColor = theme.colors.white,
+  colorGradient = [theme.colors.primary, theme.colors.secondary]
 }) => {
   const [sliderWidth, setSliderWidth] = useState(width - 40);
   
@@ -105,59 +109,37 @@ export const EmotionSlider: React.FC<EmotionSliderProps> = ({
     }
   });
   
+  // Function to normalize value from 0-100 to 0-1
+  const normalizeValue = (val: number) => val / 100;
+  
   return (
     <View style={[styles.container, style]}>
-      <Text style={[styles.label, labelStyle]}>{label}</Text>
+      <View style={styles.labelContainer}>
+        <Text style={[styles.label, labelStyle]}>{label}</Text>
+        <Text style={styles.valueText}>{Math.round(value)}</Text>
+      </View>
       
-      <View 
-        style={styles.sliderContainer}
-        onLayout={(event) => {
-          const { width } = event.nativeEvent.layout;
-          setSliderWidth(width);
-          position.setValue(valueToPosition(value));
-        }}
-      >
-        {/* Track background */}
-        <View style={[styles.track, { backgroundColor: maximumTrackTintColor }]}>
-          <LinearGradient
-            colors={gradientColors}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.gradient}
-          />
-        </View>
-        
-        {/* Active track - using a non-animated View for the fill */}
-        <View 
-          style={[
-            styles.activeTrack,
-            { 
-              backgroundColor: minimumTrackTintColor,
-              width: `${percentage}%`,
-            }
-          ]}
+      <View style={styles.sliderContainer}>
+        <Slider
+          style={styles.slider}
+          value={normalizeValue(value)}
+          onValueChange={(val) => onValueChange(val * 100)}
+          minimumValue={0}
+          maximumValue={1}
+          minimumTrackTintColor={minimumTrackTintColor}
+          maximumTrackTintColor={maximumTrackTintColor}
+          thumbTintColor={thumbTintColor}
         />
-        
-        {/* Thumb */}
-        <Animated.View
-          style={[
-            styles.thumbContainer,
-            {
-              transform: [
-                { translateX: Animated.subtract(position, THUMB_SIZE / 2) },
-                { scale }
-              ]
-            }
-          ]}
-          {...panResponder.panHandlers}
-        >
-          <View style={[styles.thumb, { backgroundColor: thumbTintColor, borderColor: minimumTrackTintColor }]} />
-        </Animated.View>
+        <LinearGradient
+          style={styles.gradient}
+          colors={colorGradient as unknown as readonly [ColorValue, ColorValue, ColorValue]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+        />
       </View>
       
       <View style={styles.labelsContainer}>
         <Text style={styles.minMaxLabel}>{minLabel}</Text>
-        <Text style={styles.valueLabel}>{Math.round(value)}</Text>
         <Text style={styles.minMaxLabel}>{maxLabel}</Text>
       </View>
     </View>
@@ -170,49 +152,35 @@ const styles = StyleSheet.create({
     marginVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.md,
   },
+  labelContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
   label: {
     fontSize: theme.typography.fontSizes.md,
     fontWeight: '700',
     color: theme.colors.charcoal,
-    marginBottom: theme.spacing.sm,
+  },
+  valueText: {
+    fontSize: theme.typography.fontSizes.md,
+    fontWeight: '700',
+    color: theme.colors.primary,
   },
   sliderContainer: {
     height: THUMB_SIZE,
     justifyContent: 'center',
     position: 'relative',
   },
-  track: {
-    height: TRACK_HEIGHT,
-    borderRadius: TRACK_HEIGHT / 2,
-    backgroundColor: theme.colors.lightGray,
-    overflow: 'hidden',
+  slider: {
+    position: 'absolute',
+    width: '100%',
+    height: THUMB_SIZE,
   },
   gradient: {
     ...StyleSheet.absoluteFillObject,
     opacity: 0.5,
-  },
-  activeTrack: {
-    position: 'absolute',
-    height: TRACK_HEIGHT,
-    borderRadius: TRACK_HEIGHT / 2,
-    left: 0,
-    top: (THUMB_SIZE - TRACK_HEIGHT) / 2,
-  },
-  thumbContainer: {
-    position: 'absolute',
-    width: THUMB_SIZE,
-    height: THUMB_SIZE,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  thumb: {
-    width: THUMB_SIZE,
-    height: THUMB_SIZE,
-    borderRadius: THUMB_SIZE / 2,
-    backgroundColor: theme.colors.white,
-    ...theme.shadows.medium,
-    borderWidth: 2,
-    borderColor: theme.colors.primary,
   },
   labelsContainer: {
     flexDirection: 'row',
@@ -222,11 +190,6 @@ const styles = StyleSheet.create({
   minMaxLabel: {
     fontSize: theme.typography.fontSizes.sm,
     color: theme.colors.darkGray,
-  },
-  valueLabel: {
-    fontSize: theme.typography.fontSizes.md,
-    fontWeight: '700',
-    color: theme.colors.primary,
   },
 });
 

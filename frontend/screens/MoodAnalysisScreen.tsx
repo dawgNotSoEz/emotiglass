@@ -12,7 +12,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '../constants/theme';
-import { RootStackParamList } from '../navigation/AppNavigator';
+import { RootStackParamList } from '../types';
 import { getAllMoodEntries } from '../services/storage';
 import { analyzeTrends, TrendAnalysisResult } from '../services/trendAnalysis';
 import { MoodTrendCharts } from '../components/ui/MoodTrendCharts';
@@ -22,35 +22,57 @@ type MoodAnalysisScreenNavigationProp = StackNavigationProp<RootStackParamList, 
 
 export const MoodAnalysisScreen: React.FC = () => {
   const navigation = useNavigation<MoodAnalysisScreenNavigationProp>();
-  const [loading, setLoading] = useState(true);
   const [trendData, setTrendData] = useState<TrendAnalysisResult | null>(null);
-  const [timeRange, setTimeRange] = useState<7 | 30 | 90>(7); // 7 days, 30 days, or 90 days
   const [entries, setEntries] = useState<MoodEntry[]>([]);
-  const [noDataMessage, setNoDataMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState(7); // Default to 7 days
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [noDataMessage, setNoDataMessage] = useState<string | null>(null);
   
   useEffect(() => {
     loadData();
   }, [timeRange]);
   
   const loadData = async () => {
+    setLoading(true);
+    setErrorMessage(null);
+    setNoDataMessage(null);
+    
     try {
-      setLoading(true);
-      const entries = await getAllMoodEntries();
+      // Load mood entries
+      const moodEntries = await getAllMoodEntries();
+      setEntries(moodEntries);
       
-      if (entries.length > 0) {
-        setEntries(entries);
-        const analysis = analyzeTrends(entries);
-        setTrendData(analysis);
-      } else {
-        setNoDataMessage('No mood entries found. Start recording your emotions to see trends.');
+      if (moodEntries.length === 0) {
+        setNoDataMessage('No mood entries found. Start by adding some mood entries to see your trends.');
+        setLoading(false);
+        return;
       }
+      
+      // Filter entries by time range
+      const now = Date.now();
+      const rangeStart = now - (timeRange * 24 * 60 * 60 * 1000);
+      const filteredEntries = moodEntries.filter(entry => entry.timestamp >= rangeStart);
+      
+      if (filteredEntries.length === 0) {
+        setNoDataMessage(`No mood entries found within the last ${timeRange} days.`);
+        setLoading(false);
+        return;
+      }
+      
+      // Analyze trends
+      const analysisResult = analyzeTrends(filteredEntries);
+      setTrendData(analysisResult);
     } catch (error) {
-      console.error('Error loading mood data:', error);
-      setErrorMessage('Failed to load mood data. Please try again later.');
+      console.error('Failed to load mood analysis data:', error);
+      setErrorMessage('An error occurred while loading your mood data. Please try again later.');
     } finally {
       setLoading(false);
     }
+  };
+  
+  const changeTimeRange = (days: number) => {
+    setTimeRange(days);
   };
   
   return (
@@ -66,56 +88,28 @@ export const MoodAnalysisScreen: React.FC = () => {
       </View>
       
       <View style={styles.timeRangeSelector}>
-        <TouchableOpacity
-          style={[
-            styles.timeRangeButton,
-            timeRange === 7 ? styles.timeRangeButtonActive : null,
-          ]}
-          onPress={() => setTimeRange(7)}
-        >
-          <Text 
-            style={[
-              styles.timeRangeText,
-              timeRange === 7 ? styles.timeRangeTextActive : null,
-            ]}
-          >
-            Week
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[
-            styles.timeRangeButton,
-            timeRange === 30 ? styles.timeRangeButtonActive : null,
-          ]}
-          onPress={() => setTimeRange(30)}
-        >
-          <Text 
-            style={[
-              styles.timeRangeText,
-              timeRange === 30 ? styles.timeRangeTextActive : null,
-            ]}
-          >
-            Month
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[
-            styles.timeRangeButton,
-            timeRange === 90 ? styles.timeRangeButtonActive : null,
-          ]}
-          onPress={() => setTimeRange(90)}
-        >
-          <Text 
-            style={[
-              styles.timeRangeText,
-              timeRange === 90 ? styles.timeRangeTextActive : null,
-            ]}
-          >
-            3 Months
-          </Text>
-        </TouchableOpacity>
+        <Text style={styles.timeRangeLabel}>Time range:</Text>
+        <View style={styles.timeRangeButtons}>
+          {[7, 14, 30, 90].map(days => (
+            <TouchableOpacity
+              key={days}
+              style={[
+                styles.timeRangeButton,
+                timeRange === days && styles.activeTimeRangeButton
+              ]}
+              onPress={() => changeTimeRange(days)}
+            >
+              <Text
+                style={[
+                  styles.timeRangeButtonText,
+                  timeRange === days && styles.activeTimeRangeButtonText
+                ]}
+              >
+                {days === 7 ? '1W' : days === 14 ? '2W' : days === 30 ? '1M' : '3M'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
       
       {loading ? (
@@ -170,27 +164,36 @@ const styles = StyleSheet.create({
   },
   timeRangeSelector: {
     flexDirection: 'row',
-    padding: spacing.md,
-    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  timeRangeButton: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    marginHorizontal: spacing.sm,
-    borderRadius: 20,
+  timeRangeLabel: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text,
+    marginRight: spacing.sm,
   },
-  timeRangeButtonActive: {
+  timeRangeButtons: {
+    flexDirection: 'row',
+  },
+  timeRangeButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    marginHorizontal: spacing.xs,
+    borderRadius: 16,
+    backgroundColor: colors.cardBackground,
+  },
+  activeTimeRangeButton: {
     backgroundColor: colors.primary,
   },
-  timeRangeText: {
-    fontSize: typography.fontSizes.md,
+  timeRangeButtonText: {
+    fontSize: typography.fontSizes.sm,
     color: colors.text,
   },
-  timeRangeTextActive: {
+  activeTimeRangeButtonText: {
     color: '#fff',
-    fontWeight: typography.fontWeights.medium,
   },
   loadingContainer: {
     flex: 1,
@@ -206,19 +209,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.lg,
+    padding: spacing.xl,
   },
   emptyText: {
     fontSize: typography.fontSizes.md,
     color: colors.textLight,
     textAlign: 'center',
-    marginTop: spacing.md,
-    marginBottom: spacing.lg,
+    marginTop: spacing.lg,
+    marginBottom: spacing.xl,
   },
   createButton: {
     backgroundColor: colors.primary,
-    paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     borderRadius: 8,
   },
   createButtonText: {
@@ -230,6 +233,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: spacing.xxl,
+    paddingBottom: spacing.xl,
   },
 }); 

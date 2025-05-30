@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
@@ -7,8 +7,9 @@ import { Ionicons } from '@expo/vector-icons';
 import theme from '../constants/theme';
 import { RootStackParamList } from '../types';
 import { analyzeEmotions } from '../services/emotionAnalysis';
-import { saveMoodEntry } from '../services/storage';
-import { EmotionData, EmotionAnalysisResult, MoodEntry } from '../types';
+import { saveMoodEntry, MoodEntry } from '../services/storage';
+import { EmotionData, EmotionAnalysisResult } from '../types';
+import { EmotionAnimatedBackground } from '../components/visualizations/EmotionAnimatedBackground';
 
 type MoodVisualizationScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -19,17 +20,6 @@ type MoodVisualizationScreenRouteProp = RouteProp<
   RootStackParamList,
   'MoodVisualization'
 >;
-
-// Placeholder component for visualization
-const MoodVisualization: React.FC<{ moodAnalysis: EmotionAnalysisResult }> = ({ moodAnalysis }) => {
-  return (
-    <View style={{
-      flex: 1,
-      backgroundColor: getEmotionColor(moodAnalysis.dominantEmotion),
-      opacity: 0.7
-    }} />
-  );
-};
 
 export const MoodVisualizationScreen: React.FC = () => {
   const navigation = useNavigation<MoodVisualizationScreenNavigationProp>();
@@ -96,11 +86,15 @@ export const MoodVisualizationScreen: React.FC = () => {
   
   return (
     <View style={styles.container}>
-      {/* Full screen visualization */}
-      <MoodVisualization moodAnalysis={moodAnalysis} />
+      {/* Background visualization */}
+      {moodAnalysis && (
+        <EmotionAnimatedBackground 
+          emotion={moodAnalysis.emotions} 
+          dominantEmotion={moodAnalysis.dominantEmotion} 
+        />
+      )}
       
-      {/* Overlay controls */}
-      <SafeAreaView style={styles.overlay}>
+      <SafeAreaView style={styles.content}>
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton}
@@ -194,7 +188,7 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSizes.lg,
     color: theme.colors.text,
   },
-  overlay: {
+  content: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.2)',
   },

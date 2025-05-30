@@ -1,69 +1,31 @@
 import * as FileSystem from 'expo-file-system';
 import { Path } from '../types';
+import { 
+  DRAWINGS_DIR, 
+  createDirectoryIfNeeded, 
+  safeWriteToFile, 
+  safeReadFromFile, 
+  safeDeleteFile,
+  exportToMediaLibrary,
+  requestFileSystemPermissions
+} from '../utils/fileSystemUtils';
 
-// Constants
-const DRAWINGS_DIR = FileSystem.documentDirectory + 'drawings/';
-
-// Helper function to ensure directory exists
-const ensureDirectoryExists = async (directory: string): Promise<boolean> => {
-  try {
-    console.log(`[drawingService] Checking if directory exists: ${directory}`);
-    const dirInfo = await FileSystem.getInfoAsync(directory);
-    
-    if (!dirInfo.exists) {
-      console.log(`[drawingService] Creating directory: ${directory}`);
-      try {
-        await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
-      } catch (dirError) {
-        console.error(`[drawingService] Error creating directory: ${directory}`, dirError);
-        return false;
-      }
-      
-      // Double-check that the directory was created
-      try {
-        const verifyInfo = await FileSystem.getInfoAsync(directory);
-        if (!verifyInfo.exists) {
-          console.error(`[drawingService] Directory not created despite no errors: ${directory}`);
-          return false;
-        }
-      } catch (verifyError) {
-        console.error(`[drawingService] Error verifying directory: ${directory}`, verifyError);
-        return false;
-      }
-      
-      console.log(`[drawingService] Directory created successfully: ${directory}`);
-    } else {
-      console.log(`[drawingService] Directory already exists: ${directory}`);
-    }
-    
-    // Check if directory is writable by trying to write a test file
-    try {
-      const testFile = `${directory}test_${Date.now()}.txt`;
-      await FileSystem.writeAsStringAsync(testFile, 'test');
-      await FileSystem.deleteAsync(testFile, { idempotent: true });
-      console.log(`[drawingService] Directory is writable: ${directory}`);
-    } catch (writeError) {
-      console.error(`[drawingService] Directory is not writable: ${directory}`, writeError);
-      return false;
-    }
-    
-    return true;
-  } catch (error) {
-    console.error(`[drawingService] Error ensuring directory exists: ${directory}`, error);
-    return false;
-  }
-};
-
-// Create drawings directory if it doesn't exist
+/**
+ * Initialize drawing storage
+ * @returns Whether initialization was successful
+ */
 export const initDrawingStorage = async (): Promise<boolean> => {
   console.log('[drawingService] Initializing drawing storage...');
   try {
-    const dirCreated = await ensureDirectoryExists(DRAWINGS_DIR);
+    // Create drawings directory if it doesn't exist
+    const dirCreated = await createDirectoryIfNeeded(DRAWINGS_DIR);
+    
     if (dirCreated) {
       console.log('[drawingService] Drawing storage initialized successfully');
     } else {
       console.error('[drawingService] Failed to initialize drawing storage');
     }
+    
     return dirCreated;
   } catch (error) {
     console.error('[drawingService] Failed to initialize drawing storage:', error);
@@ -88,13 +50,6 @@ export const saveDrawing = async (drawingData: string): Promise<string | null> =
   }
   
   try {
-    // Ensure directory exists
-    const dirCreated = await ensureDirectoryExists(DRAWINGS_DIR);
-    if (!dirCreated) {
-      console.error('[drawingService] Failed to create drawings directory');
-      return null;
-    }
-    
     // Generate unique filename based on timestamp
     const timestamp = Date.now();
     const fileName = `drawing_${timestamp}.json`;
@@ -102,8 +57,13 @@ export const saveDrawing = async (drawingData: string): Promise<string | null> =
     
     console.log(`[drawingService] Writing drawing to: ${fileUri}`);
     
-    // Write drawing data to file
-    await FileSystem.writeAsStringAsync(fileUri, drawingData);
+    // Write drawing data to file using safe write utility
+    const writeSuccess = await safeWriteToFile(fileUri, drawingData);
+    
+    if (!writeSuccess) {
+      console.error(`[drawingService] Failed to write drawing to: ${fileUri}`);
+      return null;
+    }
     
     // Verify file was written
     const fileInfo = await FileSystem.getInfoAsync(fileUri);
@@ -127,17 +87,15 @@ export const saveDrawing = async (drawingData: string): Promise<string | null> =
  */
 export const loadDrawing = async (uri: string): Promise<Path[] | null> => {
   try {
-    // Check if file exists
-    const fileInfo = await FileSystem.getInfoAsync(uri);
-    if (!fileInfo.exists) {
-      console.error(`Drawing file does not exist: ${uri}`);
+    const drawingData = await safeReadFromFile(uri);
+    
+    if (!drawingData) {
       return null;
     }
     
-    const drawingData = await FileSystem.readAsStringAsync(uri);
     return JSON.parse(drawingData) as Path[];
   } catch (error) {
-    console.error('Failed to load drawing:', error);
+    console.error('[drawingService] Failed to load drawing:', error);
     return null;
   }
 };
@@ -164,7 +122,7 @@ export const drawingToBase64 = async (drawingData: string): Promise<string | nul
     
     return mockBase64;
   } catch (error) {
-    console.error('Failed to convert drawing to base64:', error);
+    console.error('[drawingService] Failed to convert drawing to base64:', error);
     return null;
   }
 };
@@ -175,16 +133,16 @@ export const drawingToBase64 = async (drawingData: string): Promise<string | nul
  */
 export const getAllDrawings = async (): Promise<string[]> => {
   try {
-    // Create directory if it doesn't exist
-    const dirCreated = await ensureDirectoryExists(DRAWINGS_DIR);
+    // Ensure directory exists
+    const dirCreated = await createDirectoryIfNeeded(DRAWINGS_DIR);
     if (!dirCreated) {
-      console.error('Failed to ensure drawings directory exists');
+      console.error('[drawingService] Failed to ensure drawings directory exists');
       return [];
     }
     
     // Get all files in drawings directory
     const files = await FileSystem.readDirectoryAsync(DRAWINGS_DIR);
-    console.log(`Found ${files.length} drawing files`);
+    console.log(`[drawingService] Found ${files.length} drawing files`);
     
     // Filter for drawing files
     const drawingFiles = files.filter(file => file.endsWith('.json'));
@@ -194,7 +152,7 @@ export const getAllDrawings = async (): Promise<string[]> => {
     
     return drawingUris;
   } catch (error) {
-    console.error('Failed to get drawings:', error);
+    console.error('[drawingService] Failed to get drawings:', error);
     return [];
   }
 };
@@ -206,18 +164,44 @@ export const getAllDrawings = async (): Promise<string[]> => {
  */
 export const deleteDrawing = async (uri: string): Promise<boolean> => {
   try {
-    // Check if file exists
-    const fileInfo = await FileSystem.getInfoAsync(uri);
-    if (!fileInfo.exists) {
-      console.error(`Drawing file does not exist: ${uri}`);
+    const result = await safeDeleteFile(uri);
+    if (result) {
+      console.log(`[drawingService] Deleted drawing: ${uri}`);
+    } else {
+      console.error(`[drawingService] Failed to delete drawing: ${uri}`);
+    }
+    return result;
+  } catch (error) {
+    console.error('[drawingService] Failed to delete drawing:', error);
+    return false;
+  }
+};
+
+/**
+ * Export drawing to media library
+ * @param uri URI of drawing file
+ * @returns Whether export was successful
+ */
+export const exportDrawingToMediaLibrary = async (uri: string): Promise<boolean> => {
+  try {
+    // Request permissions if needed
+    const permissions = await requestFileSystemPermissions();
+    
+    if (!permissions.mediaLibrary) {
+      console.error('[drawingService] Media library permission denied');
       return false;
     }
     
-    await FileSystem.deleteAsync(uri);
-    console.log(`Deleted drawing: ${uri}`);
-    return true;
+    // For a real implementation, we would:
+    // 1. Convert the drawing to an image file
+    // 2. Save the image to the media library
+    
+    // For now, this is a placeholder that would use the exportToMediaLibrary utility
+    console.log('[drawingService] Exporting drawing to media library is not fully implemented');
+    
+    return false;
   } catch (error) {
-    console.error('Failed to delete drawing:', error);
+    console.error('[drawingService] Failed to export drawing to media library:', error);
     return false;
   }
 };
@@ -245,7 +229,7 @@ export const analyzeDrawing = async (drawingData: string): Promise<Record<string
     const uniqueColors = new Set(paths.map(path => path.color)).size;
     const avgLineWidth = paths.reduce((sum, path) => sum + path.width, 0) / Math.max(1, paths.length);
     
-    console.log(`Analyzing drawing: ${strokeCount} strokes, ${uniqueColors} colors, avg width: ${avgLineWidth}`);
+    console.log(`[drawingService] Analyzing drawing: ${strokeCount} strokes, ${uniqueColors} colors, avg width: ${avgLineWidth}`);
     
     // Generate pseudo-random but somewhat consistent emotion scores
     const emotions = {
@@ -264,7 +248,7 @@ export const analyzeDrawing = async (drawingData: string): Promise<Record<string
     
     return emotions;
   } catch (error) {
-    console.error('Failed to analyze drawing:', error);
+    console.error('[drawingService] Failed to analyze drawing:', error);
     
     // Return neutral emotions if analysis fails
     return {

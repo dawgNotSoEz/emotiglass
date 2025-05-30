@@ -279,7 +279,12 @@ export const EmotionInputScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
       
-      <ScrollView style={styles.content}>
+      <ScrollView 
+        style={styles.content}
+        // Disable scrolling when the drawing tab is active to prevent gesture conflicts
+        scrollEnabled={activeTab !== 'drawing'}
+        contentContainerStyle={styles.contentContainer}
+      >
         {activeTab === 'sliders' && (
           <View style={styles.slidersContainer}>
             <EmotionSlider
@@ -311,6 +316,7 @@ export const EmotionInputScreen: React.FC = () => {
         
         {activeTab === 'drawing' && (
           <View style={styles.drawingContainer}>
+            {/* Ensure the drawing canvas takes up available space */}
             <DrawingCanvas onDrawingComplete={handleDrawingComplete} />
           </View>
         )}
@@ -439,10 +445,14 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: theme.spacing.md,
   },
+  contentContainer: { // Added contentContainerStyle
+    flexGrow: 1, // Allows content to grow within ScrollView
+  },
   slidersContainer: {
     marginVertical: theme.spacing.md,
   },
   drawingContainer: {
+    flex: 1, // Allow drawing container to take up available space
     marginVertical: theme.spacing.md,
   },
   voiceContainer: {
@@ -504,17 +514,18 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
   },
   submitButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.primary,
-    paddingVertical: theme.spacing.md,
+    padding: theme.spacing.md,
     borderRadius: 8,
   },
   submitButtonText: {
-    color: '#fff',
+    color: theme.colors.white,
     fontSize: theme.typography.fontSizes.md,
     fontWeight: '600',
     marginRight: theme.spacing.sm,
