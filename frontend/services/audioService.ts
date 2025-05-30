@@ -1,23 +1,24 @@
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
-import { EmotionAnalysisResult, EmotionData } from '../types';
+import { EmotionData, EmotionAnalysisResult } from '../types';
 import { analyzeEmotions } from './emotionAnalysis';
 
-// Directory for storing audio recordings
-const RECORDINGS_DIRECTORY = FileSystem.documentDirectory + 'recordings/';
+// Constants
+const RECORDINGS_DIR = FileSystem.documentDirectory + 'recordings/';
 
-/**
- * Initialize the audio service
- */
-export const initAudioService = async (): Promise<void> => {
+// Initialize recording directory
+export const initAudioStorage = async (): Promise<boolean> => {
   try {
-    // Create recordings directory if it doesn't exist
-    const dirInfo = await FileSystem.getInfoAsync(RECORDINGS_DIRECTORY);
+    const dirInfo = await FileSystem.getInfoAsync(RECORDINGS_DIR);
+    
     if (!dirInfo.exists) {
-      await FileSystem.makeDirectoryAsync(RECORDINGS_DIRECTORY, { intermediates: true });
+      await FileSystem.makeDirectoryAsync(RECORDINGS_DIR, { intermediates: true });
     }
+    
+    return true;
   } catch (error) {
-    console.error('Error initializing audio service:', error);
+    console.error('Failed to initialize audio storage:', error);
+    return false;
   }
 };
 
@@ -54,35 +55,50 @@ export const startRecording = async (): Promise<Audio.Recording | null> => {
 };
 
 /**
- * Stop the current recording and save it
- * @param recording The recording to stop
- * @returns URI of the saved recording or null if failed
+ * Stop an audio recording
+ * @param recording Recording object to stop
+ * @returns URI of the recording or null if stopping failed
  */
 export const stopRecording = async (recording: Audio.Recording): Promise<string | null> => {
   try {
     await recording.stopAndUnloadAsync();
-    
-    // Get recording URI
     const uri = recording.getURI();
+    
     if (!uri) {
-      console.error('Recording URI is null');
+      console.error('No URI returned from recording');
       return null;
     }
     
-    // Generate a unique filename
-    const filename = `recording-${Date.now()}.m4a`;
-    const fileUri = RECORDINGS_DIRECTORY + filename;
+    // Save recording to storage directory
+    await initAudioStorage();
+    const fileName = `recording_${Date.now()}.m4a`;
+    const destinationUri = RECORDINGS_DIR + fileName;
     
-    // Save recording to our app directory
+    // Copy to storage directory
     await FileSystem.copyAsync({
       from: uri,
-      to: fileUri
+      to: destinationUri
     });
     
-    return fileUri;
+    return destinationUri;
   } catch (error) {
     console.error('Error stopping recording:', error);
     return null;
+  }
+};
+
+/**
+ * Delete an audio recording
+ * @param uri URI of recording to delete
+ * @returns Whether deletion was successful
+ */
+export const deleteRecording = async (uri: string): Promise<boolean> => {
+  try {
+    await FileSystem.deleteAsync(uri);
+    return true;
+  } catch (error) {
+    console.error('Error deleting recording:', error);
+    return false;
   }
 };
 
@@ -104,17 +120,21 @@ export const playRecording = async (uri: string): Promise<Audio.Sound | null> =>
 };
 
 /**
- * Delete an audio recording
- * @param uri URI of the recording to delete
- * @returns Whether deletion was successful
+ * Get all saved recordings
+ * @returns Array of recording URIs
  */
-export const deleteRecording = async (uri: string): Promise<boolean> => {
+export const getAllRecordings = async (): Promise<string[]> => {
   try {
-    await FileSystem.deleteAsync(uri);
-    return true;
+    await initAudioStorage();
+    
+    const files = await FileSystem.readDirectoryAsync(RECORDINGS_DIR);
+    const recordingFiles = files.filter(file => file.endsWith('.m4a'));
+    const recordingUris = recordingFiles.map(file => RECORDINGS_DIR + file);
+    
+    return recordingUris;
   } catch (error) {
-    console.error('Error deleting recording:', error);
-    return false;
+    console.error('Error getting recordings:', error);
+    return [];
   }
 };
 
@@ -126,20 +146,29 @@ export const deleteRecording = async (uri: string): Promise<boolean> => {
  */
 export const analyzeAudioRecording = async (uri: string): Promise<EmotionAnalysisResult> => {
   try {
+    // Get audio file info for analysis
+    const fileInfo = await FileSystem.getInfoAsync(uri);
+    
     // In a real app, this would use a speech-to-text service
-    // For now, we'll use a placeholder emotion data
+    // For now, we'll use filesize and creation timestamp to generate random but consistent emotion data
+    const fileSize = fileInfo.exists ? (fileInfo.size || 0) : 0;
+    const modificationTime = fileInfo.exists && 'modificationTime' in fileInfo ? fileInfo.modificationTime : Date.now();
+    
+    // Generate pseudo-random emotion values based on file characteristics
+    const randomSeed = (fileSize + modificationTime) % 1000 / 1000;
+    
     const emotions: EmotionData = {
-      joy: Math.random() * 0.3,
-      sadness: Math.random() * 0.2,
-      anger: Math.random() * 0.1,
-      fear: Math.random() * 0.1,
-      surprise: Math.random() * 0.1,
-      disgust: Math.random() * 0.05,
-      contentment: Math.random() * 0.3,
-      neutral: Math.random() * 0.2,
-      energy: Math.random() * 100,
-      calmness: Math.random() * 100,
-      tension: Math.random() * 100
+      joy: Math.min(0.2 + randomSeed * 0.5, 1),
+      sadness: Math.min(0.1 + (1 - randomSeed) * 0.3, 1),
+      anger: Math.min(0.05 + randomSeed * 0.2, 1),
+      fear: Math.min(0.05 + (1 - randomSeed) * 0.15, 1),
+      surprise: Math.min(0.1 + randomSeed * 0.3, 1),
+      disgust: Math.min(0.05 + randomSeed * 0.1, 1),
+      contentment: Math.min(0.2 + (1 - randomSeed) * 0.5, 1),
+      neutral: Math.min(0.1 + randomSeed * 0.2, 1),
+      energy: Math.min(40 + randomSeed * 50, 100),
+      calmness: Math.min(30 + (1 - randomSeed) * 60, 100),
+      tension: Math.min(20 + randomSeed * 70, 100)
     };
     
     // Normalize to ensure values sum to 1

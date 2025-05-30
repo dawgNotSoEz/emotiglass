@@ -1,235 +1,115 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { Camera } from 'expo-camera';
+import React, { useState } from 'react';
+import { 
+  StyleSheet, 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  ActivityIndicator 
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '../../constants/theme';
-import { analyzeImage, FaceAnalysisResult } from '../../services/faceAnalysis';
+import { FaceAnalysisResult } from '../../services/faceAnalysis';
 
-export interface FaceCameraProps {
-  onEmotionDetected?: (result: FaceAnalysisResult) => void;
-  onFaceAnalysisComplete?: (result: FaceAnalysisResult) => void;
+interface FaceCameraProps {
+  onEmotionDetected: (result: FaceAnalysisResult) => void;
+  style?: any;
 }
 
 export const FaceCamera: React.FC<FaceCameraProps> = ({ 
-  onEmotionDetected, 
-  onFaceAnalysisComplete
+  onEmotionDetected,
+  style
 }) => {
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [isCameraActive, setIsCameraActive] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [faceDetected, setFaceDetected] = useState(false);
-  const [lastEmotion, setLastEmotion] = useState<string | null>(null);
   
-  const cameraRef = useRef<Camera>(null);
-  
-  // Request camera permissions
-  useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-    })();
-  }, []);
-  
-  // Process camera feed at intervals when active
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
+  // Simulate face detection
+  const simulateFaceDetection = () => {
+    if (isProcessing) return;
     
-    if (isCameraActive && !isProcessing) {
-      interval = setInterval(async () => {
-        await processCameraFeed();
-      }, 1000); // Process every second
-    }
-    
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
-  }, [isCameraActive, isProcessing]);
-  
-  // Process camera feed and detect emotions
-  const processCameraFeed = async () => {
-    if (!cameraRef.current || isProcessing) return;
-    
-    try {
-      setIsProcessing(true);
-      
-      // Take a photo
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.5,
-        base64: true,
-        exif: false,
-      });
-      
-      // Analyze the image
-      const result = await analyzeImage(photo);
-      
-      if (result) {
-        setFaceDetected(result.faceDetected);
-        setLastEmotion(result.dominantEmotion);
-        
-        // Call the appropriate callback
-        if (onEmotionDetected) {
-          onEmotionDetected(result);
-        } else if (onFaceAnalysisComplete) {
-          onFaceAnalysisComplete(result);
+    setIsProcessing(true);
+    setTimeout(() => {
+      const mockResult: FaceAnalysisResult = {
+        faceDetected: true,
+        dominantEmotion: 'joy',
+        emotionScores: {
+          happy: 0.7,
+          sad: 0.1,
+          neutral: 0.1,
+          surprise: 0.05,
+          fear: 0.02,
+          disgust: 0.01,
+          anger: 0.02,
+          contentment: 0.4,
         }
-      } else {
-        setFaceDetected(false);
-      }
-    } catch (error) {
-      console.error('Error processing camera feed:', error);
-    } finally {
+      };
+      onEmotionDetected(mockResult);
       setIsProcessing(false);
-    }
+    }, 1000);
   };
-  
-  // Toggle camera
-  const toggleCamera = () => {
-    setIsCameraActive(prev => !prev);
-    if (!isCameraActive) {
-      setFaceDetected(false);
-      setLastEmotion(null);
-    }
-  };
-  
-  if (hasPermission === null) {
-    return <View style={styles.container} />;
-  }
-  
-  if (hasPermission === false) {
-    return (
-      <View style={styles.permissionContainer}>
-        <Ionicons name="camera-off" size={48} color={colors.textLight} />
-        <Text style={styles.permissionText}>No access to camera</Text>
-      </View>
-    );
-  }
   
   return (
-    <View style={styles.container}>
-      {isCameraActive ? (
-        <View style={styles.cameraContainer}>
-          <Camera
-            ref={cameraRef}
-            style={styles.camera}
-            type={Camera.Constants.Type.front}
-          />
-          <View style={styles.overlay}>
-            {faceDetected && lastEmotion && (
-              <View style={styles.emotionBadge}>
-                <Text style={styles.emotionText}>
-                  {lastEmotion.charAt(0).toUpperCase() + lastEmotion.slice(1)}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-      ) : (
-        <View style={styles.placeholderContainer}>
-          <Ionicons name="camera" size={48} color={colors.textLight} />
-          <Text style={styles.placeholderText}>
-            Tap to analyze your facial expressions
-          </Text>
-        </View>
-      )}
-      
-      <TouchableOpacity 
-        style={[
-          styles.cameraButton,
-          isCameraActive ? styles.cameraButtonActive : null
-        ]}
-        onPress={toggleCamera}
-      >
-        <Ionicons 
-          name={isCameraActive ? "stop-circle" : "scan"} 
-          size={24} 
-          color="#fff" 
-        />
-        <Text style={styles.buttonText}>
-          {isCameraActive ? "Stop Analysis" : "Start Analysis"}
+    <View style={[styles.container, style]}>
+      <View style={styles.placeholderContainer}>
+        <Ionicons name="camera-outline" size={48} color={colors.textLight} />
+        <Text style={styles.infoText}>
+          Camera placeholder - implementation requires additional setup
         </Text>
-      </TouchableOpacity>
+        <Text style={styles.subText}>
+          Camera functionality requires expo-camera to be properly configured
+        </Text>
+        
+        <TouchableOpacity
+          style={[styles.simulateButton, { opacity: isProcessing ? 0.5 : 1 }]}
+          onPress={simulateFaceDetection}
+          disabled={isProcessing}
+        >
+          {isProcessing ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.simulateButtonText}>Simulate Face Detection</Text>
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
-    aspectRatio: 4/3,
-    borderRadius: 12,
+    flex: 1,
+    backgroundColor: '#000',
+    borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: colors.cardBackground,
-    marginBottom: spacing.md,
-  },
-  cameraContainer: {
-    flex: 1,
-    position: 'relative',
-  },
-  camera: {
-    flex: 1,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    padding: spacing.md,
+    minHeight: 300,
   },
   placeholderContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.cardBackground,
     padding: spacing.lg,
+    backgroundColor: '#222',
   },
-  placeholderText: {
+  infoText: {
     color: colors.textLight,
-    fontSize: typography.fontSizes.md,
     textAlign: 'center',
-    marginTop: spacing.md,
+    marginVertical: spacing.md,
+    fontSize: typography.fontSizes.md,
   },
-  permissionContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.cardBackground,
-    padding: spacing.lg,
-  },
-  permissionText: {
+  subText: {
     color: colors.textLight,
-    fontSize: typography.fontSizes.md,
+    opacity: 0.7,
     textAlign: 'center',
-    marginTop: spacing.md,
-  },
-  emotionBadge: {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    borderRadius: 16,
     marginBottom: spacing.md,
+    fontSize: typography.fontSizes.sm,
   },
-  emotionText: {
-    color: '#fff',
-    fontSize: typography.fontSizes.md,
-    fontWeight: 500,
-  },
-  cameraButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary,
-    padding: spacing.sm,
+  simulateButton: {
+    backgroundColor: colors.secondary,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     borderRadius: 8,
-    margin: spacing.md,
+    marginTop: spacing.md,
   },
-  cameraButtonActive: {
-    backgroundColor: colors.error,
-  },
-  buttonText: {
+  simulateButtonText: {
     color: '#fff',
     fontSize: typography.fontSizes.md,
-    fontWeight: 500,
-    marginLeft: spacing.xs,
   },
 }); 

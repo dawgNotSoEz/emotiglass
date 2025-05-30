@@ -1,5 +1,4 @@
 import { MoodEntry, EmotionData } from '../types';
-import { getDummyTrendData } from './dummyData';
 
 export interface MoodTrend {
   label: string;
@@ -30,32 +29,54 @@ export interface TrendAnalysisResult {
  * @returns Analysis of trends in the data
  */
 export const analyzeTrends = (entries: MoodEntry[]): TrendAnalysisResult => {
-  // For prototype, use dummy data
-  const dummyData = getDummyTrendData();
+  if (entries.length === 0) {
+    return {
+      trends: {
+        energy: { label: 'Energy', data: [], color: '#3498db' },
+        calmness: { label: 'Calmness', data: [], color: '#2ecc71' },
+        tension: { label: 'Tension', data: [], color: '#e74c3c' }
+      },
+      emotionFrequency: {},
+      timeOfDay: {},
+      dayOfWeek: {},
+      insights: []
+    };
+  }
   
-  // Generate some insights
-  const insights = [
-    {
-      type: 'positive' as const,
-      text: 'Your mood has been improving over the past week.'
-    },
-    {
-      type: 'neutral' as const,
-      text: 'You tend to record your emotions most often during the evening.'
-    },
-    {
-      type: 'positive' as const,
-      text: 'Your energy levels are highest on weekends.'
-    },
-    {
-      type: 'negative' as const,
-      text: 'You experience more tension on Mondays and Tuesdays.'
-    }
-  ];
+  // Sort entries by timestamp
+  const sortedEntries = [...entries].sort((a, b) => a.timestamp - b.timestamp);
   
-  // Create trend data from dummy entries
-  const sortedEntries = [...dummyData.entries].sort((a, b) => a.timestamp - b.timestamp);
+  // Calculate emotion distribution
+  const emotionDistribution = calculateEmotionDistribution(entries);
   
+  // Calculate time of day distribution
+  const timeOfDayDistribution = calculateTimeOfDayDistribution(entries);
+  
+  // Calculate weekday distribution
+  const weekdayDistribution = calculateWeekdayDistribution(entries);
+  
+  // Calculate emotion parameters
+  const emotionParameters = calculateEmotionParameters(entries);
+  
+  // Generate insights
+  const insights = generateInsights(
+    sortedEntries,
+    emotionDistribution,
+    timeOfDayDistribution,
+    weekdayDistribution
+  ).map(text => ({
+    type: determineInsightType(text),
+    text
+  }));
+  
+  // Find overall dominant emotion
+  const dominantEmotion = Object.entries(emotionDistribution)
+    .reduce((max, [emotion, count]) => 
+      count > max.count ? { emotion, count } : max, 
+      { emotion: 'neutral', count: 0 }
+    ).emotion;
+  
+  // Create trend data
   const trends = {
     energy: {
       label: 'Energy',
@@ -76,22 +97,9 @@ export const analyzeTrends = (entries: MoodEntry[]): TrendAnalysisResult => {
   
   return {
     trends,
-    emotionFrequency: dummyData.emotionFrequency,
-    timeOfDay: {
-      morning: 5,
-      afternoon: 8,
-      evening: 12,
-      night: 3
-    },
-    dayOfWeek: {
-      Sunday: 4,
-      Monday: 5,
-      Tuesday: 3,
-      Wednesday: 4,
-      Thursday: 6,
-      Friday: 5,
-      Saturday: 3
-    },
+    emotionFrequency: emotionDistribution,
+    timeOfDay: timeOfDayDistribution,
+    dayOfWeek: weekdayDistribution,
     insights
   };
 };
