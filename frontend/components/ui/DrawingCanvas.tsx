@@ -1,422 +1,346 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, View, PanResponder, Dimensions, TouchableOpacity, Text, Alert } from 'react-native';
+import React, { useState, useRef, useCallback } from 'react';
+import { 
+  StyleSheet, 
+  View, 
+  Dimensions, 
+  TouchableOpacity, 
+  Text, 
+  Alert, 
+  ActivityIndicator,
+  ViewStyle,
+  TextStyle,
+  StyleProp,
+  GestureResponderEvent,
+  Platform
+} from 'react-native';
 import Svg, { Path, G } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { colors as themeColors, spacing, typography } from '../../constants/theme';
-import { Point, Path as DrawingPath } from '../../types';
 import * as FileSystem from 'expo-file-system';
-import { LinearGradient } from 'expo-linear-gradient';
+import * as MediaLibrary from 'expo-media-library';
+import ViewShot from 'react-native-view-shot';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { Canvas, Path as SkiaPath, Skia, PaintStyle } from '@shopify/react-native-skia';
+
+/**
+ * Type definitions for Drawing Canvas component
+ */
+type Point = {
+  x: number;
+  y: number;
+};
+
+// SkPath type from Skia
+type SkPath = ReturnType<typeof Skia.Path.Make>;
+
+// SkiaPath is a component, but Skia.Path.Make() returns SkPath (the path object)
+type DrawingPath = {
+  id: string;
+  points: Point[];
+  color: string;
+  width: number;
+  skiaPath: SkPath;
+};
+
+type ColorOption = string; // Hex color value
+
+type StrokeWidthOption = number; // Stroke width in pixels
 
 interface DrawingCanvasProps {
-  onDrawingComplete: (drawingData: string) => void;
-  width?: number;
-  height?: number;
+  /** Width of the canvas */
+  width?: number | string;
+  /** Height of the canvas */
+  height?: number | string;
+  /** Initial stroke color (hex) */
+  initialColor?: string;
+  /** Initial stroke width */
+  initialStrokeWidth?: number;
+  /** Additional container styles */
+  style?: StyleProp<ViewStyle>;
+  /** Callback when drawing is complete */
+  onDrawingComplete?: (drawingData: string) => void;
+  /** Callback when drawing starts */
+  onDrawingStart?: () => void;
+  /** Callback when drawing ends */
+  onDrawingEnd?: () => void;
+  /** Callback when drawing is saved */
+  onSave?: (uri: string) => void;
+  /** Error handler */
+  onError?: (error: Error) => void;
 }
-
-// Set up the drawings directory
-const DRAWINGS_DIR = FileSystem.documentDirectory + 'drawings/';
-
-// Ensure directory exists
-const ensureDirectoryExists = async (directory: string): Promise<boolean> => {
-  try {
-    console.log(`Checking if directory exists: ${directory}`);
-    const dirInfo = await FileSystem.getInfoAsync(directory);
-    
-    if (!dirInfo.exists) {
-      console.log(`Creating directory: ${directory}`);
-      try {
-        await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
-      } catch (dirError) {
-        console.error(`Error creating directory: ${directory}`, dirError);
-        return false;
-      }
-      
-      // Verify directory was created
-      const verifyInfo = await FileSystem.getInfoAsync(directory);
-      if (!verifyInfo.exists) {
-        console.error(`Failed to create directory: ${directory}`);
-        return false;
-      }
-      console.log(`Directory created successfully: ${directory}`);
-    } else {
-      console.log(`Directory already exists: ${directory}`);
-    }
-    
-    return true;
-  } catch (error) {
-    console.error(`Error ensuring directory exists: ${directory}`, error);
-    return false;
-  }
-};
 
 export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   onDrawingComplete,
+  onDrawingStart,
+  onDrawingEnd,
+  onSave,
+  onError,
   width = Dimensions.get('window').width - 32,
   height = 300,
+  initialColor = '#000000',
+  initialStrokeWidth = 3,
 }) => {
+  // State
   const [paths, setPaths] = useState<DrawingPath[]>([]);
-  const [currentPath, setCurrentPath] = useState<DrawingPath | null>(null);
-  const [currentColor, setCurrentColor] = useState('#000000');
-  const [currentWidth, setCurrentWidth] = useState(3);
-  const [previewMode, setPreviewMode] = useState(false);
-  const [directoryReady, setDirectoryReady] = useState(false);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const svgRef = useRef<any>(null);
+  const [currentPoints, setCurrentPoints] = useState<Point[]>([]);
+  const [currentColor, setCurrentColor] = useState<string>(initialColor);
+  const [currentWidth, setCurrentWidth] = useState<number>(initialStrokeWidth);
+  const [isDrawing, setIsDrawing] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
   
-  // Available colors
-  const colorOptions = [
+  // Refs
+  const viewShotRef = useRef<ViewShot>(null);
+  
+  // Color and width options
+  const colorOptions: ColorOption[] = [
     '#000000', // Black
-    '#e74c3c', // Red
-    '#3498db', // Blue
-    '#2ecc71', // Green
-    '#f1c40f', // Yellow
-    '#9b59b6', // Purple
-    '#e67e22', // Orange
-    '#1abc9c', // Turquoise
-    '#d35400', // Burnt Orange
-    '#8e44ad', // Violet
-    '#2980b9', // Ocean Blue
-    '#c0392b', // Dark Red
+    '#FF3B30', // Red
+    '#34C759', // Green
+    '#007AFF', // Blue
+    '#FFCC00', // Yellow
   ];
-  
-  // Available stroke widths
-  const strokeWidths = [1, 2, 4, 6, 8, 12];
-  
-  // Initialize directory
-  useEffect(() => {
-    const initDirectory = async () => {
-      try {
-        console.log('Initializing drawing directory...');
-        const success = await ensureDirectoryExists(DRAWINGS_DIR);
-        if (success) {
-          console.log('Drawing directory initialized successfully');
-          setDirectoryReady(true);
-        } else {
-          console.error('Failed to initialize drawing directory');
-          Alert.alert(
-            'Storage Error',
-            'Unable to access storage for saving drawings. Drawing functionality may be limited.',
-            [{ text: 'OK' }]
-          );
-        }
-      } catch (error) {
-        console.error('Failed to initialize drawing directory:', error);
-        Alert.alert(
-          'Storage Error',
-          'Unable to access storage for saving drawings. Drawing functionality may be limited.',
-          [{ text: 'OK' }]
-        );
-      }
-    };
-    
-    initDirectory();
-  }, []);
 
-  // Debug log path data
-  useEffect(() => {
-    if (paths.length > 0) {
-      console.log(`Drawing updated - ${paths.length} paths`);
-      console.log(`Latest path has ${paths[paths.length-1].points.length} points and color ${paths[paths.length-1].color}`);
-      const drawingData = JSON.stringify(paths);
-      onDrawingComplete(drawingData);
-    }
-  }, [paths]);
+  const strokeWidths: StrokeWidthOption[] = [1, 2, 4, 6, 8];
   
-  // Pan responder for touch handling
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => {
-        console.log(`onStartShouldSetPanResponder - previewMode: ${previewMode}`);
-        return !previewMode;
-      },
-      onMoveShouldSetPanResponder: () => {
-        return !previewMode;
-      },
-      onPanResponderGrant: (event, gestureState) => {
-        if (previewMode) return;
-        
-        const { locationX, locationY } = event.nativeEvent;
-        console.log(`Starting drawing at: ${locationX}, ${locationY} with color ${currentColor} and width ${currentWidth}`);
+  // Helper: Create Skia Path from points
+  const createSkiaPath = (points: Point[]): SkPath => {
+    const skiaPath = Skia.Path.Make();
+    if (points.length === 0) return skiaPath;
+    skiaPath.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      skiaPath.lineTo(points[i].x, points[i].y);
+    }
+    // If only one point, draw a dot
+    if (points.length === 1) {
+      skiaPath.addCircle(points[0].x, points[0].y, currentWidth / 2);
+    }
+    return skiaPath;
+  };
+  
+  // Pan gesture for drawing
+  const panGesture = Gesture.Pan()
+    .runOnJS(true)
+    .onStart((e) => {
+      setCurrentPoints([{ x: e.x, y: e.y }]);
         setIsDrawing(true);
-        
-        // Start a new path
+      if (onDrawingStart) onDrawingStart();
+    })
+    .onUpdate((e) => {
+      setCurrentPoints((prev) => [...prev, { x: e.x, y: e.y }]);
+    })
+    .onEnd(() => {
+      if (currentPoints.length === 0) {
+        setIsDrawing(false);
+        setCurrentPoints([]);
+        return;
+      }
+      const skiaPath = createSkiaPath(currentPoints);
         const newPath: DrawingPath = {
-          points: [{ x: locationX, y: locationY }],
+        id: Date.now().toString(),
+        points: currentPoints,
           color: currentColor,
           width: currentWidth,
-        };
-        
-        setCurrentPath(newPath);
-      },
-      onPanResponderMove: (event, gestureState) => {
-        if (!currentPath || previewMode) return;
-        
-        const { locationX, locationY } = event.nativeEvent;
-        
-        // Add point to the current path
-        setCurrentPath(prevPath => {
-          if (!prevPath) return null;
-          
-          return {
-            ...prevPath,
-            points: [...prevPath.points, { x: locationX, y: locationY }],
-          };
-        });
-      },
-      onPanResponderRelease: () => {
-        if (!currentPath || previewMode) return;
-        
-        console.log(`Finished drawing path with ${currentPath.points.length} points using color ${currentPath.color}`);
+        skiaPath,
+      };
+      setPaths((prev) => {
+        const updated = [...prev, newPath];
+        if (onDrawingComplete) onDrawingComplete(JSON.stringify(updated));
+        return updated;
+      });
+      setCurrentPoints([]);
         setIsDrawing(false);
-        
-        // Only add the path if it has more than one point
-        if (currentPath.points.length >= 1) {
-          setPaths(prevPaths => [...prevPaths, currentPath]);
-          console.log(`Added path with color ${currentPath.color} and width ${currentPath.width}`);
-        } else {
-          console.log('Path too short, not adding');
-        }
-        
-        setCurrentPath(null);
-      },
-    })
-  ).current;
-  
-  // Clear the canvas
-  const handleClear = () => {
-    if (paths.length === 0) return;
-    
-    Alert.alert(
-      'Clear Canvas',
-      'Are you sure you want to clear your drawing?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Clear', 
-          style: 'destructive',
-          onPress: () => {
-            setPaths([]);
-            setCurrentPath(null);
-            onDrawingComplete('[]');
-            console.log('Canvas cleared');
-          }
-        }
-      ]
-    );
-  };
+      if (onDrawingEnd) onDrawingEnd();
+    });
   
   // Undo the last path
-  const handleUndo = () => {
-    if (paths.length === 0) return;
-    
-    const newPaths = paths.slice(0, -1);
-    setPaths(newPaths);
-    console.log(`Undid last path, ${newPaths.length} paths remaining`);
-  };
+  const handleUndo = useCallback(() => {
+    setPaths((prev) => {
+      const updated = prev.slice(0, -1);
+      if (onDrawingComplete) onDrawingComplete(JSON.stringify(updated));
+      return updated;
+    });
+  }, [onDrawingComplete]);
   
-  // Toggle preview mode
-  const togglePreviewMode = () => {
-    setPreviewMode(!previewMode);
-    console.log(`Preview mode: ${!previewMode}`);
-  };
+  // Clear the canvas
+  const handleClear = useCallback(() => {
+            setPaths([]);
+    setCurrentPoints([]);
+    if (onDrawingComplete) onDrawingComplete(JSON.stringify([]));
+  }, [onDrawingComplete]);
   
-  // Save drawing to file
-  const saveDrawing = async () => {
-    if (paths.length === 0) {
-      Alert.alert('Nothing to save', 'Please draw something first');
-      return;
-    }
-    
-    if (!directoryReady) {
-      Alert.alert('Storage not ready', 'Please try again in a moment');
-      return;
+  // Handle color change
+  const handleColorChange = useCallback((color: string) => {
+    setCurrentColor(color);
+  }, []);
+  
+  // Handle stroke width change
+  const handleWidthChange = useCallback((width: number) => {
+    setCurrentWidth(width);
+  }, []);
+  
+  // Export drawing as base64
+  const exportAsBase64 = async (): Promise<string | null> => {
+    if (!viewShotRef.current) {
+      console.warn('ViewShot ref is not available');
+      return null;
     }
     
     try {
-      // Create a unique filename
-      const fileName = `drawing_${Date.now()}.json`;
-      const fileUri = `${DRAWINGS_DIR}${fileName}`;
+      setIsExporting(true);
+      const uri = await viewShotRef.current?.capture?.();
       
-      console.log(`Attempting to save drawing to: ${fileUri}`);
+      if (!uri) {
+        setIsExporting(false);
+        return null;
+      }
       
-      // Ensure directory exists again just to be safe
-      const dirExists = await ensureDirectoryExists(DRAWINGS_DIR);
-      if (!dirExists) {
-        console.error('Could not ensure drawings directory exists');
-        Alert.alert('Error', 'Failed to access storage for saving. Please try again.');
+      // Convert to base64
+      const base64 = await FileSystem.readAsStringAsync(uri as string, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      
+      setIsExporting(false);
+      return base64;
+    } catch (error) {
+      console.error('Error exporting drawing:', error);
+      setIsExporting(false);
+      Alert.alert('Export Failed', 'Could not export the drawing. Please try again.');
+      return null;
+    }
+  };
+  
+  // Save drawing to media library
+  const saveToMediaLibrary = async () => {
+    if (!viewShotRef.current) return;
+    
+    try {
+      // Request permissions
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Media library permission is required to save drawings.');
         return;
       }
       
-      // Save the drawing data
-      const drawingData = JSON.stringify(paths);
-      await FileSystem.writeAsStringAsync(fileUri, drawingData);
+      setIsExporting(true);
       
-      console.log(`Drawing saved successfully to: ${fileUri}`);
-      Alert.alert('Success', 'Drawing saved successfully');
+      // Capture the view
+      if (!viewShotRef.current) {
+        console.error('ViewShot ref is not available');
+        return;
+      }
+      const uri = await viewShotRef.current?.capture?.();
+      
+      // Optimize the image
+      const optimizedImage = await ImageManipulator.manipulateAsync(
+        uri as string,
+        [],
+        { compress: 0.8, format: ImageManipulator.SaveFormat.PNG }
+      );
+      
+      // Save to media library
+      const asset = await MediaLibrary.createAssetAsync(optimizedImage.uri);
+      await MediaLibrary.createAlbumAsync('EmotiGlass Drawings', asset, false);
+      
+      setIsExporting(false);
+      Alert.alert('Success', 'Drawing saved to your media library.');
     } catch (error) {
       console.error('Error saving drawing:', error);
-      Alert.alert('Error', 'Failed to save drawing. Please try again.');
+      setIsExporting(false);
+      Alert.alert('Error', 'Failed to save drawing.');
     }
   };
   
-  // Handle color selection
-  const handleColorChange = (color: string) => {
-    console.log(`Color changed to: ${color}`);
-    setCurrentColor(color);
-  };
-
-  // Handle width selection
-  const handleWidthChange = (width: number) => {
-    console.log(`Width changed to: ${width}`);
-    setCurrentWidth(width);
-  };
-  
-  // Create SVG path data from points
-  const createSvgPath = (points: Point[]): string => {
-    if (points.length === 0) return '';
-    if (points.length === 1) {
-      // For a single point, create a small circle
-      const { x, y } = points[0];
-      return `M ${x-1} ${y} a 1,1 0 1,0 2,0 a 1,1 0 1,0 -2,0`;
-    }
-    
-    // Start at the first point
-    let path = `M ${points[0].x} ${points[0].y}`;
-    
-    // Add line to each subsequent point
-    for (let i = 1; i < points.length; i++) {
-      path += ` L ${points[i].x} ${points[i].y}`;
-    }
-    
-    return path;
-  };
-  
-  // Add test paths for debugging
-  const addTestPaths = () => {
-    const testPaths: DrawingPath[] = [
-      {
-        points: [
-          { x: 50, y: 50 },
-          { x: 100, y: 100 },
-          { x: 150, y: 50 },
-          { x: 200, y: 100 }
-        ],
-        color: '#FF0000',
-        width: 5
-      },
-      {
-        points: [
-          { x: 50, y: 150 },
-          { x: 200, y: 150 }
-        ],
-        color: '#0000FF',
-        width: 10
-      }
-    ];
-    
-    setPaths([...paths, ...testPaths]);
-    console.log('Added test paths');
+  // Render current path as SkiaPath
+  const renderCurrentSkiaPath = () => {
+    if (currentPoints.length === 0) return null;
+    const skiaPath = createSkiaPath(currentPoints);
+    return (
+      <SkiaPath
+        path={skiaPath}
+        color={currentColor}
+        strokeWidth={currentWidth}
+        style="stroke"
+        strokeCap="round"
+        strokeJoin="round"
+      />
+    );
   };
   
   return (
     <View style={styles.container}>
-      <View style={styles.toolbarTop}>
-        <View style={styles.toolbarLeft}>
-          <TouchableOpacity 
-            onPress={togglePreviewMode} 
-            style={[styles.toolButton, previewMode && styles.activeToolButton]}
-          >
-            <Ionicons 
-              name={previewMode ? "eye" : "eye-outline"} 
-              size={24} 
-              color={previewMode ? "#fff" : "#333"} 
-            />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={saveDrawing} style={styles.toolButton}>
-            <Ionicons name="save-outline" size={24} color="#333" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={addTestPaths} style={styles.toolButton}>
-            <Ionicons name="add-circle-outline" size={24} color="#333" />
-          </TouchableOpacity>
-        </View>
-        
-        <View style={styles.toolbarRight}>
-          <TouchableOpacity onPress={handleUndo} style={styles.toolButton} disabled={paths.length === 0}>
-            <Ionicons name="arrow-undo" size={24} color={paths.length === 0 ? "#ccc" : "#333"} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleClear} style={styles.toolButton} disabled={paths.length === 0}>
-            <Ionicons name="trash-outline" size={24} color={paths.length === 0 ? "#ccc" : "#333"} />
-          </TouchableOpacity>
-        </View>
-      </View>
-      
-      <View
-        style={[
-          styles.canvasContainer,
-          { width, height },
-          previewMode && styles.previewCanvas
-        ]}
-        {...panResponder.panHandlers}
+      {/* Drawing Canvas */}
+      <ViewShot
+        ref={viewShotRef}
+        options={{ format: 'png', quality: 0.9 }}
+        style={{ width: typeof width === 'number' ? width : Dimensions.get('window').width - 32, height: typeof height === 'number' ? height : 300, backgroundColor: '#FFFFFF' }}
       >
-        <Svg width="100%" height="100%" style={styles.svg} ref={svgRef}>
-          <G>
+        <GestureDetector gesture={panGesture}>
+          <Canvas style={{ width: typeof width === 'number' ? width : Dimensions.get('window').width - 32, height: typeof height === 'number' ? height : 300 } as any}>
             {/* Render completed paths */}
-            {paths.map((path, index) => (
-              <Path
-                key={`path-${index}`}
-                d={createSvgPath(path.points)}
-                stroke={path.color}
+            {paths.map((path) => (
+              <SkiaPath
+                key={path.id}
+                path={path.skiaPath}
+                color={path.color}
                 strokeWidth={path.width}
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+                style="stroke"
+                strokeCap="round"
+                strokeJoin="round"
               />
             ))}
             
             {/* Render current path */}
-            {currentPath && (
-              <Path
-                d={createSvgPath(currentPath.points)}
-                stroke={currentPath.color}
-                strokeWidth={currentPath.width}
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            )}
-          </G>
-        </Svg>
-        
-        {/* Preview mode overlay */}
-        {previewMode && (
-          <View style={styles.previewOverlay}>
-            <Text style={styles.previewText}>Preview Mode</Text>
+            {renderCurrentSkiaPath()}
+          </Canvas>
+        </GestureDetector>
+      </ViewShot>
+      
+      {/* Toolbar */}
+      <View style={styles.toolbar}>
+        {/* Drawing Tools */}
+        <View style={styles.toolSection}>
+          <TouchableOpacity
+            style={styles.toolButton}
+            onPress={handleUndo}
+            disabled={paths.length === 0}
+          >
+            <Ionicons
+              name="arrow-undo"
+              size={24}
+              color={paths.length === 0 ? themeColors.textLight : themeColors.primary}
+            />
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.toolButton}
+            onPress={handleClear}
+            disabled={paths.length === 0}
+          >
+            <Ionicons
+              name="trash-outline"
+              size={24}
+              color={paths.length === 0 ? themeColors.textLight : themeColors.primary}
+            />
+          </TouchableOpacity>
+          
             <TouchableOpacity 
-              onPress={togglePreviewMode} 
-              style={styles.exitPreviewButton}
-            >
-              <Text style={styles.exitPreviewText}>Exit Preview</Text>
+            style={styles.toolButton}
+            onPress={saveToMediaLibrary}
+            disabled={paths.length === 0 || isExporting}
+          >
+            <Ionicons
+              name="save-outline"
+              size={24}
+              color={paths.length === 0 ? themeColors.textLight : themeColors.primary}
+            />
             </TouchableOpacity>
           </View>
-        )}
         
-        {!directoryReady && (
-          <View style={styles.initializingOverlay}>
-            <Text style={styles.initializingText}>Initializing drawing tools...</Text>
-          </View>
-        )}
-        
-        {isDrawing && (
-          <View style={styles.drawingIndicator}>
-            <Text style={styles.drawingIndicatorText}>Drawing...</Text>
-          </View>
-        )}
-      </View>
-      
-      {!previewMode && (
-        <View style={styles.toolbarBottom}>
+        {/* Color Picker */}
           <View style={styles.colorPickerContainer}>
-            <Text style={styles.toolbarLabel}>Colors:</Text>
+          <Text style={styles.toolbarLabel}>Color</Text>
             <View style={styles.colorPicker}>
               {colorOptions.map((color) => (
                 <TouchableOpacity
@@ -427,17 +351,14 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
                     currentColor === color && styles.selectedColor,
                   ]}
                   onPress={() => handleColorChange(color)}
-                  activeOpacity={0.7}
                 />
               ))}
             </View>
-            <Text style={styles.currentSelectionText}>
-              Selected: <Text style={{color: currentColor}}>⬤</Text> ({currentColor})
-            </Text>
           </View>
           
+        {/* Stroke Width Picker */}
           <View style={styles.widthPickerContainer}>
-            <Text style={styles.toolbarLabel}>Brush Size:</Text>
+          <Text style={styles.toolbarLabel}>Stroke Width</Text>
             <View style={styles.widthPicker}>
               {strokeWidths.map((width) => (
                 <TouchableOpacity
@@ -447,7 +368,6 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
                     currentWidth === width && styles.selectedWidth,
                   ]}
                   onPress={() => handleWidthChange(width)}
-                  activeOpacity={0.7}
                 >
                   <View
                     style={[
@@ -457,50 +377,15 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
                   />
                 </TouchableOpacity>
               ))}
-            </View>
-            <Text style={styles.currentSelectionText}>Selected width: {currentWidth}px</Text>
-          </View>
-
-          <View style={styles.testDrawButtons}>
-            <TouchableOpacity 
-              style={styles.testButton} 
-              onPress={() => {
-                const testPath: DrawingPath = {
-                  points: [
-                    { x: 50, y: 50 },
-                    { x: 100, y: 100 }
-                  ],
-                  color: currentColor,
-                  width: currentWidth
-                };
-                setPaths(prev => [...prev, testPath]);
-                console.log(`Added test line with color ${currentColor} and width ${currentWidth}`);
-              }}
-            >
-              <Text style={styles.testButtonText}>Test Line</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.testButton} 
-              onPress={() => {
-                const testPath: DrawingPath = {
-                  points: [{ x: 150, y: 75 }],
-                  color: currentColor,
-                  width: currentWidth
-                };
-                setPaths(prev => [...prev, testPath]);
-                console.log(`Added test dot with color ${currentColor} and width ${currentWidth}`);
-              }}
-            >
-              <Text style={styles.testButtonText}>Test Dot</Text>
-            </TouchableOpacity>
           </View>
         </View>
-      )}
+      </View>
       
-      {paths.length === 0 && !currentPath && (
-        <View style={styles.emptyCanvasOverlay}>
-          <Text style={styles.emptyCanvasText}>Draw here</Text>
+      {/* Loading Overlay */}
+      {isExporting && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={themeColors.primary} />
+          <Text style={styles.loadingText}>Processing...</Text>
         </View>
       )}
     </View>
@@ -509,60 +394,41 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
 
 const styles = StyleSheet.create({
   container: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
     alignItems: 'center',
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: themeColors.border,
     position: 'relative',
   },
-  canvasContainer: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
+  canvas: {
+    backgroundColor: '#FFFFFF',
     borderRadius: 8,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  previewCanvas: {
-    borderColor: themeColors.primary,
-    borderWidth: 2,
-  },
-  svg: {
-    backgroundColor: 'transparent',
     flex: 1,
   },
-  toolbarTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    padding: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: themeColors.border,
-  },
-  toolbarLeft: {
-    flexDirection: 'row',
-  },
-  toolbarRight: {
-    flexDirection: 'row',
-  },
-  toolbarBottom: {
-    width: '100%',
+  toolbar: {
     padding: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: themeColors.border,
+  },
+  toolSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: themeColors.border,
   },
   toolButton: {
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: spacing.xs,
     borderRadius: 20,
-  },
-  activeToolButton: {
-    backgroundColor: themeColors.primary,
   },
   colorPickerContainer: {
     marginBottom: spacing.sm,
@@ -585,7 +451,7 @@ const styles = StyleSheet.create({
   selectedColor: {
     borderWidth: 3,
     borderColor: '#333',
-    transform: [{ scale: 1.2 }]
+    transform: [{ scale: 1.2 }],
   },
   widthPickerContainer: {
     marginTop: spacing.sm,
@@ -619,52 +485,17 @@ const styles = StyleSheet.create({
     color: themeColors.textLight,
     fontWeight: typography.fontWeights.medium,
   },
-  previewOverlay: {
+  loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  previewText: {
-    color: '#fff',
-    fontSize: typography.fontSizes.lg,
-    fontWeight: typography.fontWeights.bold,
-    marginBottom: spacing.md,
-  },
-  exitPreviewButton: {
-    backgroundColor: themeColors.primary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 4,
-  },
-  exitPreviewText: {
-    color: '#fff',
-    fontSize: typography.fontSizes.sm,
-    fontWeight: typography.fontWeights.medium,
-  },
-  initializingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  initializingText: {
-    color: themeColors.textLight,
+  loadingText: {
+    marginTop: spacing.sm,
+    color: themeColors.primary,
     fontSize: typography.fontSizes.md,
     fontWeight: typography.fontWeights.medium,
-  },
-  drawingIndicator: {
-    position: 'absolute',
-    bottom: 10,
-    right: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  drawingIndicatorText: {
-    color: '#fff',
-    fontSize: typography.fontSizes.sm,
   },
   emptyCanvasOverlay: {
     position: 'absolute',
@@ -674,33 +505,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    pointerEvents: 'none',
   },
   emptyCanvasText: {
     color: 'rgba(0, 0, 0, 0.2)',
     fontSize: typography.fontSizes.xl,
     fontWeight: typography.fontWeights.bold,
-  },
-  currentSelectionText: {
-    marginTop: spacing.xs,
-    fontSize: typography.fontSizes.sm,
-    color: themeColors.text,
-  },
-  testDrawButtons: {
-    flexDirection: 'row',
-    marginTop: spacing.md,
-    justifyContent: 'center',
-  },
-  testButton: {
-    backgroundColor: themeColors.primary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 4,
-    marginHorizontal: spacing.sm,
-  },
-  testButtonText: {
-    color: '#fff',
-    fontSize: typography.fontSizes.sm,
-    fontWeight: typography.fontWeights.medium,
   },
 }); 
