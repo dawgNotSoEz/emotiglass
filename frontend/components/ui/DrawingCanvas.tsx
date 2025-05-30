@@ -68,7 +68,7 @@ interface DrawingCanvasProps {
   onSave?: (uri: string) => void;
   /** Error handler */
   onError?: (error: Error) => void;
-}
+  }
 
 export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   onDrawingComplete,
@@ -101,7 +101,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     '#007AFF', // Blue
     '#FFCC00', // Yellow
   ];
-
+  
   const strokeWidths: StrokeWidthOption[] = [1, 2, 4, 6, 8];
   
   // Helper: Create Skia Path from points
@@ -329,7 +329,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
             style={styles.toolButton}
             onPress={saveToMediaLibrary}
             disabled={paths.length === 0 || isExporting}
-          >
+            >
             <Ionicons
               name="save-outline"
               size={24}
