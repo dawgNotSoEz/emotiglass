@@ -1,136 +1,160 @@
-# EmotiGlass Frontend
+# EmotiGlass - Emotion Tracking and Visualization App
 
-EmotiGlass is a React Native/Expo app that enables users to express, visualize, and track their emotions through various interactive input methods. The app uses different visualization techniques to represent emotional states and provides tools for tracking emotional patterns over time.
+EmotiGlass is a cross-platform (mobile + web) emotion journaling tool that uses drawing, sliders, voice, and facial expression to detect emotions and visualize them.
 
 ## Features
 
-- **Multiple Emotion Input Methods:**
-  - Interactive sliders to manually adjust emotion parameters
-  - Drawing canvas for expressing emotions through art
-  - Voice recorder to analyze emotional content in speech
-  - Facial expression analysis using the device camera
+- **Emotion Input Methods**:
+  - Drawing canvas with touch support
+  - Voice recording (mobile only, with web fallback)
+  - Face detection (mobile only, with web fallback)
+  - Emotion sliders for manual input
 
-- **Advanced Emotion Visualizations:**
-  - Dynamic animated backgrounds that change with emotions
-  - Particle effects that respond to emotional intensity
-  - Interactive charts for visualizing emotional trends
+- **Visualization**:
+  - Mood trends and analysis
+  - Daily emotion journal
+  - Ambient visualization mode
 
-- **Emotion Tracking and Analysis:**
-  - Mood diary to record and review emotional states
-  - Trend analysis with multiple chart types
-  - Filtering and searching through historical entries
+- **Cross-Platform Support**:
+  - Mobile-first design
+  - Web compatibility with graceful fallbacks
+  - Responsive UI for different screen sizes
 
-## Setup Instructions
+## Technical Implementation
+
+### UI Components
+
+The app is built with modular, reusable components:
+
+- **VoiceRecorder**: Records audio on mobile with expo-av, provides dummy data on web
+- **FaceDetector**: Captures facial expressions with expo-camera and expo-face-detector
+- **EmotionSlider**: Custom slider for emotion intensity input
+- **DrawingCanvas**: Touch-enabled drawing surface with gesture support
+- **MoodVisualization**: Visualization components for emotion data
+
+All components use React.createElement for improved type safety and cross-platform compatibility.
+
+### File System & Platform Compatibility
+
+- Custom file system utilities for both web and mobile
+- Platform-specific implementations with graceful fallbacks
+- Web-specific mocks for mobile-only features
+
+### State Management
+
+- React Context API for global state
+- Custom hooks for feature-specific logic
+- Efficient data flow with prop drilling minimization
+
+## Cross-Platform Implementation
+
+### TypeScript and React.createElement
+
+To ensure maximum compatibility between web and mobile platforms, we use the following strategies:
+
+1. **React.createElement Instead of JSX**: Many components are implemented using React.createElement instead of JSX syntax. This approach resolves TypeScript compatibility issues that can arise between different React type definitions in the web and mobile environments.
+
+2. **Type-Safe Components**: All UI components are designed with strict TypeScript typing to catch errors at compile time rather than runtime.
+
+### Platform-Specific Features with Fallbacks
+
+For features that are only available on certain platforms, we implement graceful fallbacks:
+
+1. **Storage**: 
+   - Mobile: Uses `expo-secure-store` and `expo-file-system` for secure, persistent storage
+   - Web: Falls back to `localStorage` with similar API signatures
+
+2. **Media Features**:
+   - Mobile: Uses native camera and microphone access
+   - Web: Provides simulated data or simplified alternatives
+
+3. **UI Components**:
+   - Mobile-specific UI (like BlurView) is replaced with cross-platform alternatives on web
+   - Maintains consistent look and feel across platforms
+
+### Module Declarations
+
+To support TypeScript with platform-specific modules, we provide custom type declarations in `global.d.ts` for:
+
+- expo-linear-gradient
+- expo-blur
+- react-native-chart-kit
+- expo-secure-store
+- expo-media-library
+- expo-image-manipulator
+- react-native-view-shot
+
+This allows the TypeScript compiler to understand these modules even when they're not available on web platforms.
+
+## Development Setup
 
 ### Prerequisites
 
-- Node.js (v16 or newer)
+- Node.js (v14+)
 - npm or yarn
 - Expo CLI (`npm install -g expo-cli`)
-- A mobile device or emulator/simulator
 
 ### Installation
 
-1. Clone the repository:
-   ```
-   git clone <repository-url>
-   cd emotiglass/frontend
-   ```
-
+1. Clone the repository
 2. Install dependencies:
    ```
+   cd emotiglass/frontend
    npm install
-   # or
-   yarn install
    ```
 
-3. Start the development server:
-   ```
-   npx expo start
-   ```
+### Running the App
 
-4. Open the app on your device:
-   - Scan the QR code with the Expo Go app (Android) or Camera app (iOS)
-   - Or press 'a' to open on an Android emulator or 'i' for iOS simulator
+- **Mobile (iOS/Android)**:
+  ```
+  npm start
+  ```
+  Then scan the QR code with the Expo Go app
 
-### Required Permissions
+- **Web**:
+  ```
+  npm run web
+  ```
 
-The app requires the following permissions:
-- Camera access (for facial expression analysis)
-- Microphone access (for voice recording)
-- Storage access (for saving drawings and recordings)
-
-## Directory Structure
+## Project Structure
 
 ```
 frontend/
-  ├── assets/            # Static assets (images, fonts)
-  ├── components/        # React components
-  │   ├── ui/            # Reusable UI components
-  │   └── visualizations/ # Emotion visualization components
-  ├── constants/         # App constants and configuration
-  ├── docs/              # Documentation
-  ├── hooks/             # Custom React hooks
-  ├── navigation/        # Navigation configuration
-  ├── screens/           # App screens
-  ├── services/          # Business logic and data services
-  └── utils/             # Utility functions
+  ├── assets/          # Static assets (images, sounds)
+  ├── components/      # UI components
+  │   ├── ui/          # Base UI components
+  │   └── visualizations/ # Visualization components
+  ├── constants/       # App constants and theme
+  ├── hooks/           # Custom React hooks
+  ├── navigation/      # Navigation setup
+  ├── screens/         # App screens
+  ├── services/        # Business logic and services
+  └── utils/           # Utility functions
 ```
 
-## Usage Guide
+## Architecture Decisions
 
-### Emotion Input
-
-1. **Sliders:** Adjust the sliders to indicate your energy, calmness, and tension levels.
-2. **Drawing:** Express your emotions by drawing on the canvas with different colors and brush sizes.
-3. **Voice:** Record a voice note to analyze emotional content in your speech patterns.
-4. **Face:** Use the camera to capture and analyze your facial expressions.
-
-### Visualization
-
-After inputting your emotions, the app will:
-1. Analyze the inputs to determine your emotional state
-2. Generate visualizations based on the analysis
-3. Provide options to save the entry to your mood diary
-
-### Trend Analysis
-
-Access the Mood Analysis screen to:
-1. View charts of your emotional trends over time
-2. Adjust the time range (1 week, 2 weeks, 1 month, 3 months)
-3. Gain insights about your emotional patterns
-
-## Development Guidelines
-
-### Adding New Components
-
-1. Create the component in the appropriate directory
-2. Follow the existing design patterns and styling approaches
-3. Use the theme constants for colors, spacing, and typography
-4. Write proper TypeScript interfaces for props
-
-### Styling Conventions
-
-- Use StyleSheet.create() for all styles
-- Reference theme constants for consistent design
-- Use the GlassCard component for card-like UI elements
-- Implement responsive layouts using percentages and Dimensions API
-
-### Testing
-
-Run tests with:
-```
-npm test
-```
-
-## Learn More
-
-See the [architecture documentation](./docs/architecture.md) for a deeper understanding of how the app works.
+- **TypeScript** for type safety and better developer experience
+- **Expo** for simplified mobile development and web compatibility
+- **React Navigation** for smooth navigation between screens
+- **React.createElement** for consistent rendering across platforms
+- **Platform-specific modules** for native features with web fallbacks
 
 ## Contributing
 
-Contributions are welcome! Please read the contribution guidelines before submitting a pull request.
+1. Fork the repository
+2. Create a feature branch
+3. Submit a pull request
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the MIT License. 
+
+## Development Tips
+
+When working on this codebase:
+
+1. **Testing Cross-Platform**: Always test changes on both web and mobile platforms
+2. **Platform Detection**: Use `Platform.OS` to provide platform-specific implementations
+3. **Error Handling**: Implement robust error handling for platform-specific features
+4. **Dependency Imports**: Use conditional imports for native modules to prevent web build errors 

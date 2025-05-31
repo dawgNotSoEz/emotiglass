@@ -39,6 +39,75 @@ const formatDate = (date: Date): string => {
   return date.toLocaleDateString();
 };
 
+// Mock data for mood entries
+const mockEntries = [
+  {
+    id: '1',
+    date: '2025-05-31T15:30:00Z',
+    mood: 'Happy',
+    emotionValues: {
+      happiness: 0.85,
+      surprise: 0.15,
+      neutral: 0.0,
+      anger: 0.0,
+    },
+    notes: 'Had a great meeting with the team!',
+    tags: ['work', 'success'],
+  },
+  {
+    id: '2',
+    date: '2025-05-30T18:45:00Z',
+    mood: 'Relaxed',
+    emotionValues: {
+      happiness: 0.6,
+      surprise: 0.0,
+      neutral: 0.4,
+      anger: 0.0,
+    },
+    notes: 'Evening walk in the park',
+    tags: ['nature', 'exercise'],
+  },
+  {
+    id: '3',
+    date: '2025-05-30T09:15:00Z',
+    mood: 'Focused',
+    emotionValues: {
+      happiness: 0.3,
+      surprise: 0.0,
+      neutral: 0.7,
+      anger: 0.0,
+    },
+    notes: 'Morning meditation session helped me focus',
+    tags: ['meditation', 'morning'],
+  },
+  {
+    id: '4',
+    date: '2025-05-29T20:00:00Z',
+    mood: 'Frustrated',
+    emotionValues: {
+      happiness: 0.0,
+      surprise: 0.1,
+      neutral: 0.3,
+      anger: 0.6,
+    },
+    notes: 'Traffic jam on the way home',
+    tags: ['traffic', 'stress'],
+  },
+  {
+    id: '5',
+    date: '2025-05-29T12:30:00Z',
+    mood: 'Excited',
+    emotionValues: {
+      happiness: 0.7,
+      surprise: 0.3,
+      neutral: 0.0,
+      anger: 0.0,
+    },
+    notes: 'Lunch with an old friend',
+    tags: ['friends', 'food'],
+  },
+];
+
 export const MoodDiaryScreen: React.FC = () => {
   const navigation = useNavigation<MoodDiaryScreenNavigationProp>();
   const toast = useToast();
@@ -217,11 +286,11 @@ export const MoodDiaryScreen: React.FC = () => {
         activeOpacity={0.7}
       >
         <Card style={styles.entryCard} elevation="medium" padding="none" borderRadius="medium">
-          <View style={[styles.emotionIndicator, { backgroundColor: emotionColor }]} />
-          <View style={styles.entryContent}>
-            <Text style={styles.emotionText}>{item.dominantEmotion.toUpperCase()}</Text>
-            <Text style={styles.dateText}>{formattedDate}</Text>
-            
+        <View style={[styles.emotionIndicator, { backgroundColor: emotionColor }]} />
+        <View style={styles.entryContent}>
+          <Text style={styles.emotionText}>{item.dominantEmotion.toUpperCase()}</Text>
+          <Text style={styles.dateText}>{formattedDate}</Text>
+          
             {/* Display notes if available */}
             {item.notes && (
               <Text style={styles.notesText} numberOfLines={2}>
@@ -230,10 +299,10 @@ export const MoodDiaryScreen: React.FC = () => {
             )}
             
             <View style={styles.entryDetails}>
-              <View style={styles.entryStats}>
-                <Text style={styles.statText}>Energy: {Math.round(item.emotions.energy)}%</Text>
-                <Text style={styles.statText}>Calmness: {Math.round(item.emotions.calmness)}%</Text>
-                <Text style={styles.statText}>Tension: {Math.round(item.emotions.tension)}%</Text>
+          <View style={styles.entryStats}>
+            <Text style={styles.statText}>Energy: {Math.round(item.emotions.energy)}%</Text>
+            <Text style={styles.statText}>Calmness: {Math.round(item.emotions.calmness)}%</Text>
+            <Text style={styles.statText}>Tension: {Math.round(item.emotions.tension)}%</Text>
               </View>
               
               {/* Show drawing thumbnail if drawing data is available */}
@@ -256,15 +325,15 @@ export const MoodDiaryScreen: React.FC = () => {
                 color={theme.colors.textLight} 
               />
               <Text style={styles.sourceText}>{item.source}</Text>
-            </View>
           </View>
-          
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => handleDeleteEntry(item.id)}
-          >
-            <Ionicons name="trash-outline" size={20} color={theme.colors.error} />
-          </TouchableOpacity>
+        </View>
+        
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => handleDeleteEntry(item.id)}
+        >
+          <Ionicons name="trash-outline" size={20} color={theme.colors.error} />
+        </TouchableOpacity>
         </Card>
       </TouchableOpacity>
     );
@@ -476,14 +545,14 @@ export const MoodDiaryScreen: React.FC = () => {
         <View style={styles.emptyContainer}>
           {entries.length === 0 ? (
             <>
-              <Ionicons name="journal-outline" size={64} color={theme.colors.textLight} />
-              <Text style={styles.emptyText}>No mood entries yet</Text>
-              <TouchableOpacity
-                style={styles.createButton}
-                onPress={() => navigation.navigate('EmotionInput')}
-              >
-                <Text style={styles.createButtonText}>Create New Entry</Text>
-              </TouchableOpacity>
+          <Ionicons name="journal-outline" size={64} color={theme.colors.textLight} />
+          <Text style={styles.emptyText}>No mood entries yet</Text>
+          <TouchableOpacity
+            style={styles.createButton}
+            onPress={() => navigation.navigate('EmotionInput')}
+          >
+            <Text style={styles.createButtonText}>Create New Entry</Text>
+          </TouchableOpacity>
             </>
           ) : (
             <>

@@ -15,7 +15,6 @@ import Animated, {
   withSpring,
   interpolateColor
 } from 'react-native-reanimated';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../constants/theme';
 
@@ -62,43 +61,61 @@ export const AnimatedTabBar: React.FC<AnimatedTabBarProps> = ({
     };
   });
   
-  return (
-    <View style={[styles.container, style]}>
-      <BlurView intensity={80} tint="light" style={styles.blurContainer}>
-        {/* Animated indicator */}
-        <Animated.View style={[styles.indicator, indicatorStyle]} />
+  return React.createElement(
+    View, 
+    { style: [styles.container, style] },
+    React.createElement(
+      View, 
+      { style: styles.blurContainer },
+      [
+        // Animated indicator
+        React.createElement(
+          Animated.View, 
+          { key: 'indicator', style: [styles.indicator, indicatorStyle] }
+        ),
         
-        {/* Tab items */}
-        <View style={styles.tabsContainer}>
-          {tabs.map((tab, index) => {
+        // Tab items
+        React.createElement(
+          View, 
+          { key: 'tabs-container', style: styles.tabsContainer },
+          tabs.map((tab, index) => {
             const isActive = tab.key === activeTab;
             
-            return (
-              <TouchableOpacity
-                key={tab.key}
-                style={[styles.tabItem, { width: tabWidth }]}
-                onPress={() => onTabPress(tab.key)}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={tab.icon}
-                  size={24}
-                  color={isActive ? theme.colors.primary : theme.colors.darkGray}
-                />
-                <Text
-                  style={[
-                    styles.tabText,
-                    { color: isActive ? theme.colors.primary : theme.colors.darkGray }
-                  ]}
-                >
-                  {tab.title}
-                </Text>
-              </TouchableOpacity>
+            return React.createElement(
+              TouchableOpacity,
+              {
+                key: tab.key,
+                style: [styles.tabItem, { width: tabWidth }],
+                onPress: () => onTabPress(tab.key),
+                activeOpacity: 0.7
+              },
+              [
+                React.createElement(
+                  Ionicons,
+                  {
+                    key: 'icon',
+                    name: tab.icon,
+                    size: 24,
+                    color: isActive ? theme.colors.primary : theme.colors.textLight
+                  }
+                ),
+                React.createElement(
+                  Text,
+                  {
+                    key: 'text',
+                    style: [
+                      styles.tabText,
+                      { color: isActive ? theme.colors.primary : theme.colors.textLight }
+                    ]
+                  },
+                  tab.title
+                )
+              ]
             );
-          })}
-        </View>
-      </BlurView>
-    </View>
+          })
+        )
+      ]
+    )
   );
 };
 
@@ -119,14 +136,15 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: theme.radii.lg,
     borderTopRightRadius: theme.radii.lg,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.glassBorder,
+    borderTopColor: theme.colors.border,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)', // Simulating blur with semi-transparent white
   },
   indicator: {
     position: 'absolute',
     height: 4,
     backgroundColor: theme.colors.primary,
     top: 0,
-    borderRadius: theme.radii.round,
+    borderRadius: theme.radii.full,
   },
   tabsContainer: {
     flex: 1,

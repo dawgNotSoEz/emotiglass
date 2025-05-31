@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import Svg, { Path, G } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
-import { colors as themeColors, spacing, typography } from '../../constants/theme';
+import theme from '../../constants/theme';
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import ViewShot from 'react-native-view-shot';
@@ -194,11 +194,11 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       
       // Create a new path with current settings
       const skiaPath = createSkiaPath(currentPoints);
-      const newPath: DrawingPath = {
+        const newPath: DrawingPath = {
         id: Date.now().toString(),
         points: currentPoints,
-        color: currentColor,
-        width: currentWidth,
+          color: currentColor,
+          width: currentWidth,
         skiaPath,
       };
       
@@ -233,7 +233,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   
   // Clear the canvas
   const handleClear = useCallback(() => {
-    setPaths([]);
+            setPaths([]);
     setCurrentPoints([]);
     if (onDrawingComplete) onDrawingComplete(JSON.stringify([]));
   }, [onDrawingComplete]);
@@ -485,7 +485,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
             <Ionicons
               name="arrow-undo"
               size={24}
-              color={paths.length === 0 ? themeColors.textLight : themeColors.primary}
+              color={paths.length === 0 ? theme.colors.textLight : theme.colors.primary}
             />
           </TouchableOpacity>
           
@@ -497,11 +497,11 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
             <Ionicons
               name="trash-outline"
               size={24}
-              color={paths.length === 0 ? themeColors.textLight : themeColors.primary}
+              color={paths.length === 0 ? theme.colors.textLight : theme.colors.primary}
             />
           </TouchableOpacity>
           
-          <TouchableOpacity 
+            <TouchableOpacity 
             style={styles.toolButton}
             onPress={saveToMediaLibrary}
             disabled={paths.length === 0 || isExporting}
@@ -509,10 +509,10 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
             <Ionicons
               name="save-outline"
               size={24}
-              color={paths.length === 0 ? themeColors.textLight : themeColors.primary}
+              color={paths.length === 0 ? theme.colors.textLight : theme.colors.primary}
             />
-          </TouchableOpacity>
-        </View>
+            </TouchableOpacity>
+          </View>
         
         {/* Add Clear Button */}
         <TouchableOpacity
@@ -553,46 +553,46 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       </View>
       
       {/* Color Picker */}
-      <View style={styles.colorPickerContainer}>
+          <View style={styles.colorPickerContainer}>
         <Text style={styles.toolbarLabel}>Color</Text>
-        <View style={styles.colorPicker}>
-          {colorOptions.map((color) => (
-            <TouchableOpacity
-              key={color}
-              style={[
-                styles.colorButton,
-                { backgroundColor: color },
-                currentColor === color && styles.selectedColor,
-              ]}
-              onPress={() => handleColorChange(color)}
-            />
-          ))}
-        </View>
-      </View>
-      
+            <View style={styles.colorPicker}>
+              {colorOptions.map((color) => (
+                <TouchableOpacity
+                  key={color}
+                  style={[
+                    styles.colorButton,
+                    { backgroundColor: color },
+                    currentColor === color && styles.selectedColor,
+                  ]}
+                  onPress={() => handleColorChange(color)}
+                />
+              ))}
+            </View>
+          </View>
+          
       {/* Stroke Width Picker */}
-      <View style={styles.widthPickerContainer}>
+          <View style={styles.widthPickerContainer}>
         <Text style={styles.toolbarLabel}>Stroke Width</Text>
-        <View style={styles.widthPicker}>
-          {strokeWidths.map((width) => (
-            <TouchableOpacity
-              key={width}
-              style={[
-                styles.widthButton,
-                currentWidth === width && styles.selectedWidth,
-              ]}
-              onPress={() => handleWidthChange(width)}
-            >
-              <View
-                style={[
-                  styles.widthIndicator,
-                  { height: width, backgroundColor: currentColor },
-                ]}
-              />
-            </TouchableOpacity>
-          ))}
+            <View style={styles.widthPicker}>
+              {strokeWidths.map((width) => (
+                <TouchableOpacity
+                  key={width}
+                  style={[
+                    styles.widthButton,
+                    currentWidth === width && styles.selectedWidth,
+                  ]}
+                  onPress={() => handleWidthChange(width)}
+                >
+                  <View
+                    style={[
+                      styles.widthIndicator,
+                      { height: width, backgroundColor: currentColor },
+                    ]}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
         </View>
-      </View>
     </View>
   );
 };
@@ -624,22 +624,22 @@ const styles = StyleSheet.create({
   },
   activeCanvas: {
     borderWidth: 2,
-    borderColor: themeColors.primary,
+    borderColor: theme.colors.primary,
     borderStyle: 'dashed',
   },
   toolbar: {
-    padding: spacing.sm,
+    padding: theme.spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: themeColors.border,
+    borderTopColor: theme.colors.border,
     width: '100%', // Ensure toolbar takes full width
   },
   toolSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-    paddingBottom: spacing.sm,
+    marginBottom: theme.spacing.sm,
+    paddingBottom: theme.spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: themeColors.border,
+    borderBottomColor: theme.colors.border,
   },
   toolButton: {
     width: 40,
@@ -649,19 +649,19 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   colorPickerContainer: {
-    marginBottom: spacing.sm,
+    marginBottom: theme.spacing.sm,
   },
   colorPicker: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: spacing.xs,
+    marginTop: theme.spacing.xs,
   },
   colorButton: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    marginRight: spacing.sm,
-    marginBottom: spacing.xs,
+    marginRight: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
     borderWidth: 1,
     borderColor: '#ddd',
     elevation: 2,
@@ -672,25 +672,25 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.2 }],
   },
   widthPickerContainer: {
-    marginTop: spacing.sm,
+    marginTop: theme.spacing.sm,
   },
   widthPicker: {
     flexDirection: 'row',
-    marginTop: spacing.xs,
+    marginTop: theme.spacing.xs,
   },
   widthButton: {
     width: 40,
     height: 30,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.sm,
+    marginRight: theme.spacing.sm,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 4,
     elevation: 2,
   },
   selectedWidth: {
-    borderColor: themeColors.primary,
+    borderColor: theme.colors.primary,
     borderWidth: 2,
     backgroundColor: 'rgba(74, 144, 226, 0.1)',
   },
@@ -699,9 +699,9 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   toolbarLabel: {
-    fontSize: typography.fontSizes.sm,
-    color: themeColors.textLight,
-    fontWeight: typography.fontWeights.medium,
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textLight,
+    fontWeight: '500' as const,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -710,10 +710,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: spacing.sm,
-    color: themeColors.primary,
-    fontSize: typography.fontSizes.md,
-    fontWeight: typography.fontWeights.medium,
+    marginTop: theme.spacing.sm,
+    color: theme.colors.primary,
+    fontSize: theme.typography.fontSizes.md,
+    fontWeight: '500' as const,
   },
   emptyCanvasOverlay: {
     position: 'absolute',
@@ -727,38 +727,38 @@ const styles = StyleSheet.create({
   },
   emptyCanvasText: {
     color: 'rgba(0, 0, 0, 0.2)',
-    fontSize: typography.fontSizes.lg,
-    fontWeight: typography.fontWeights.medium,
-    marginBottom: spacing.sm,
+    fontSize: theme.typography.fontSizes.lg,
+    fontWeight: '500' as const,
+    marginBottom: theme.spacing.sm,
   },
   clearButton: {
-    backgroundColor: themeColors.lightGray,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
+    backgroundColor: theme.colors.lightGray,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
     borderRadius: 4,
-    marginHorizontal: spacing.sm,
+    marginHorizontal: theme.spacing.sm,
   },
   clearButtonText: {
-    color: themeColors.text,
-    fontSize: typography.fontSizes.sm,
-    fontWeight: typography.fontWeights.medium,
+    color: theme.colors.text,
+    fontSize: theme.typography.fontSizes.sm,
+    fontWeight: '500' as const,
   },
   disabledButton: {
     opacity: 0.5,
   },
   disabledText: {
-    color: themeColors.textLight,
+    color: theme.colors.textLight,
   },
   exportButton: {
-    backgroundColor: themeColors.primary,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
     borderRadius: 4,
-    marginHorizontal: spacing.sm,
+    marginHorizontal: theme.spacing.sm,
   },
   exportButtonText: {
-    color: themeColors.white,
-    fontSize: typography.fontSizes.sm,
-    fontWeight: typography.fontWeights.medium,
+    color: theme.colors.text,
+    fontSize: theme.typography.fontSizes.sm,
+    fontWeight: '500' as const,
   },
 }); 

@@ -1,15 +1,32 @@
-import * as SecureStore from 'expo-secure-store';
-import * as FileSystem from 'expo-file-system';
+import { Platform } from 'react-native';
 import { MoodEntry } from '../types';
 import { generateMoodEntries } from './dummyData';
 
+// Import expo modules conditionally to avoid web build issues
+let SecureStore: any = null;
+let FileSystem: any = null;
+
+// Only import native modules on mobile platforms
+if (Platform.OS !== 'web') {
+  try {
+    SecureStore = require('expo-secure-store');
+    FileSystem = require('expo-file-system');
+  } catch (error) {
+    console.warn('Failed to import mobile-specific modules:', error);
+  }
+}
+
 const MOOD_ENTRIES_KEY = 'emotiglass_mood_entries_index';
-const MOOD_ENTRIES_DIR = FileSystem.documentDirectory + 'mood_entries/';
+const MOOD_ENTRIES_DIR = FileSystem?.documentDirectory ? FileSystem.documentDirectory + 'mood_entries/' : null;
 
 export type { MoodEntry };
 
-// Helper function to ensure directory exists
+// Helper function to ensure directory exists (mobile only)
 const ensureDirectoryExists = async (directory: string): Promise<boolean> => {
+  if (Platform.OS === 'web' || !FileSystem) {
+    return true; // On web, directories don't need to be created
+  }
+
   try {
     const dirInfo = await FileSystem.getInfoAsync(directory);
     
@@ -28,19 +45,14 @@ const ensureDirectoryExists = async (directory: string): Promise<boolean> => {
 // Initialize storage
 export const initStorage = async (): Promise<boolean> => {
   try {
-    // Create mood entries directory if it doesn't exist
-    const dirCreated = await ensureDirectoryExists(MOOD_ENTRIES_DIR);
-    
-    if (!dirCreated) {
-      console.error('Failed to create mood entries directory');
-      return false;
-    }
-    
-    // Double check that the directory exists
-    const dirInfo = await FileSystem.getInfoAsync(MOOD_ENTRIES_DIR);
-    if (!dirInfo.exists) {
-      console.error('Directory still does not exist after creation attempt');
-      return false;
+    // Create mood entries directory if needed (mobile only)
+    if (Platform.OS !== 'web' && MOOD_ENTRIES_DIR) {
+      const dirCreated = await ensureDirectoryExists(MOOD_ENTRIES_DIR);
+      
+      if (!dirCreated) {
+        console.error('Failed to create mood entries directory');
+        return false;
+      }
     }
     
     // Check if we have any entries already
@@ -64,10 +76,18 @@ export const initStorage = async (): Promise<boolean> => {
   }
 };
 
-// Get entry index (list of entry IDs)
+// Get entry index from secure storage or localStorage
 export const getEntryIndex = async (): Promise<string[]> => {
   try {
-    const indexJson = await SecureStore.getItemAsync(MOOD_ENTRIES_KEY);
+    let indexJson: string | null = null;
+    
+    if (Platform.OS === 'web') {
+      // Use localStorage on web
+      indexJson = localStorage.getItem(MOOD_ENTRIES_KEY);
+    } else if (SecureStore) {
+      // Use SecureStore on native
+      indexJson = await SecureStore.getItemAsync(MOOD_ENTRIES_KEY);
+    }
     
     if (!indexJson) {
       return [];
@@ -83,7 +103,16 @@ export const getEntryIndex = async (): Promise<string[]> => {
 // Update entry index
 export const updateEntryIndex = async (entryIds: string[]): Promise<boolean> => {
   try {
-    await SecureStore.setItemAsync(MOOD_ENTRIES_KEY, JSON.stringify(entryIds));
+    const indexJson = JSON.stringify(entryIds);
+    
+    if (Platform.OS === 'web') {
+      // Use localStorage on web
+      localStorage.setItem(MOOD_ENTRIES_KEY, indexJson);
+    } else if (SecureStore) {
+      // Use SecureStore on native
+      await SecureStore.setItemAsync(MOOD_ENTRIES_KEY, indexJson);
+    }
+    
     return true;
   } catch (error) {
     console.error('Failed to update entry index:', error);
@@ -94,11 +123,13 @@ export const updateEntryIndex = async (entryIds: string[]): Promise<boolean> => 
 // Save a mood entry
 export const saveMoodEntry = async (entry: MoodEntry): Promise<boolean> => {
   try {
-    // Ensure directory exists
-    const dirCreated = await ensureDirectoryExists(MOOD_ENTRIES_DIR);
-    if (!dirCreated) {
-      console.error('Failed to ensure mood entries directory exists');
-      return false;
+    // Ensure directory exists (mobile only)
+    if (Platform.OS !== 'web' && MOOD_ENTRIES_DIR) {
+      const dirCreated = await ensureDirectoryExists(MOOD_ENTRIES_DIR);
+      if (!dirCreated) {
+        console.error('Failed to ensure mood entries directory exists');
+        return false;
+      }
     }
     
     // Get current entry index
@@ -110,11 +141,18 @@ export const saveMoodEntry = async (entry: MoodEntry): Promise<boolean> => {
       await updateEntryIndex(entryIds);
     }
     
-    // Save entry to file
-    const entryPath = MOOD_ENTRIES_DIR + entry.id + '.json';
-    await FileSystem.writeAsStringAsync(entryPath, JSON.stringify(entry));
+    // Save entry data
+    const entryJson = JSON.stringify(entry);
     
-    console.log(`Saved mood entry at: ${entryPath}`);
+    if (Platform.OS === 'web') {
+      // Use localStorage on web
+      localStorage.setItem(`${MOOD_ENTRIES_KEY}_${entry.id}`, entryJson);
+    } else if (MOOD_ENTRIES_DIR && FileSystem) {
+      // Use FileSystem on native
+      const entryPath = MOOD_ENTRIES_DIR + entry.id + '.json';
+      await FileSystem.writeAsStringAsync(entryPath, entryJson);
+    }
+    
     return true;
   } catch (error) {
     console.error('Failed to save mood entry:', error);
@@ -125,40 +163,56 @@ export const saveMoodEntry = async (entry: MoodEntry): Promise<boolean> => {
 // Get a single mood entry
 export const getMoodEntry = async (id: string): Promise<MoodEntry | null> => {
   try {
-    // Ensure directory exists
-    await ensureDirectoryExists(MOOD_ENTRIES_DIR);
+    let entryJson: string | null = null;
     
-    const entryPath = MOOD_ENTRIES_DIR + id + '.json';
-    
-    // Check if file exists
-    const fileInfo = await FileSystem.getInfoAsync(entryPath);
-    if (!fileInfo.exists) {
-      console.warn(`Mood entry file does not exist: ${entryPath}`);
-      // Clean up the index by removing the non-existent entry
-      const entryIds = await getEntryIndex();
-      if (entryIds.includes(id)) {
-        console.log(`Removing non-existent entry ${id} from index`);
-        const newEntryIds = entryIds.filter(entryId => entryId !== id);
-        await updateEntryIndex(newEntryIds);
+    if (Platform.OS === 'web') {
+      // Use localStorage on web
+      entryJson = localStorage.getItem(`${MOOD_ENTRIES_KEY}_${id}`);
+      if (!entryJson) {
+        // Clean up the index by removing the non-existent entry
+        const entryIds = await getEntryIndex();
+        if (entryIds.includes(id)) {
+          const newEntryIds = entryIds.filter(entryId => entryId !== id);
+          await updateEntryIndex(newEntryIds);
+        }
+        return null;
       }
-      return null;
-    }
-    
-    try {
-      const entryJson = await FileSystem.readAsStringAsync(entryPath);
+      
       return JSON.parse(entryJson) as MoodEntry;
-    } catch (readError) {
-      console.error(`Error reading mood entry file ${entryPath}:`, readError);
-      // File exists but cannot be read or is corrupted, clean up
-      await FileSystem.deleteAsync(entryPath, { idempotent: true });
-      // Remove from index
-      const entryIds = await getEntryIndex();
-      if (entryIds.includes(id)) {
-        const newEntryIds = entryIds.filter(entryId => entryId !== id);
-        await updateEntryIndex(newEntryIds);
+    } else if (MOOD_ENTRIES_DIR && FileSystem) {
+      // Use FileSystem on native
+      const entryPath = MOOD_ENTRIES_DIR + id + '.json';
+      
+      // Check if file exists
+      const fileInfo = await FileSystem.getInfoAsync(entryPath);
+      if (!fileInfo.exists) {
+        // Clean up the index
+        const entryIds = await getEntryIndex();
+        if (entryIds.includes(id)) {
+          const newEntryIds = entryIds.filter(entryId => entryId !== id);
+          await updateEntryIndex(newEntryIds);
+        }
+        return null;
       }
-      return null;
+      
+      try {
+        entryJson = await FileSystem.readAsStringAsync(entryPath);
+        return JSON.parse(entryJson) as MoodEntry;
+      } catch (readError) {
+        console.error(`Error reading mood entry file ${entryPath}:`, readError);
+        await FileSystem.deleteAsync(entryPath, { idempotent: true });
+        
+        // Remove from index
+        const entryIds = await getEntryIndex();
+        if (entryIds.includes(id)) {
+          const newEntryIds = entryIds.filter(entryId => entryId !== id);
+          await updateEntryIndex(newEntryIds);
+        }
+        return null;
+      }
     }
+    
+    return null;
   } catch (error) {
     console.error(`Failed to get mood entry ${id}:`, error);
     return null;
@@ -168,9 +222,6 @@ export const getMoodEntry = async (id: string): Promise<MoodEntry | null> => {
 // Get all mood entries
 export const getAllMoodEntries = async (): Promise<MoodEntry[]> => {
   try {
-    // Ensure directory exists
-    await ensureDirectoryExists(MOOD_ENTRIES_DIR);
-    
     // Get entry index
     const entryIds = await getEntryIndex();
     
@@ -208,13 +259,19 @@ export const deleteMoodEntry = async (id: string): Promise<boolean> => {
     const newEntryIds = entryIds.filter(entryId => entryId !== id);
     await updateEntryIndex(newEntryIds);
     
-    // Delete entry file
-    const entryPath = MOOD_ENTRIES_DIR + id + '.json';
-    
-    // Check if file exists before deleting
-    const fileInfo = await FileSystem.getInfoAsync(entryPath);
-    if (fileInfo.exists) {
-      await FileSystem.deleteAsync(entryPath);
+    // Delete entry data
+    if (Platform.OS === 'web') {
+      // Use localStorage on web
+      localStorage.removeItem(`${MOOD_ENTRIES_KEY}_${id}`);
+    } else if (MOOD_ENTRIES_DIR && FileSystem) {
+      // Use FileSystem on native
+      const entryPath = MOOD_ENTRIES_DIR + id + '.json';
+      
+      // Check if file exists before deleting
+      const fileInfo = await FileSystem.getInfoAsync(entryPath);
+      if (fileInfo.exists) {
+        await FileSystem.deleteAsync(entryPath);
+      }
     }
     
     return true;

@@ -311,8 +311,8 @@ export const MoodVisualizationScreen: React.FC = () => {
           <Animated.View style={animatedTextStyle}>
             <Text style={styles.dominantEmotionText}>
               {dominantEmotion.charAt(0).toUpperCase() + dominantEmotion.slice(1)}
-            </Text>
-            
+          </Text>
+          
             <Card style={styles.descriptionCard}>
               <Text style={styles.descriptionText}>{getEmotionDescription()}</Text>
             </Card>
@@ -343,7 +343,7 @@ export const MoodVisualizationScreen: React.FC = () => {
                     <Text style={styles.moodFactorLabel}>Energy</Text>
                     <View style={styles.moodFactorBarContainer}>
                       <Animated.View 
-                        style={[
+                      style={[
                           styles.moodFactorBar,
                           { backgroundColor: theme.colors.primary },
                           useAnimatedStyle(() => ({
@@ -352,8 +352,8 @@ export const MoodVisualizationScreen: React.FC = () => {
                               withTiming(`${emotionData.energy}%`, { duration: 1000 })
                             )
                           }))
-                        ]} 
-                      />
+                      ]}
+                    />
                     </View>
                     <Text style={styles.moodFactorValue}>{Math.round(emotionData.energy)}%</Text>
                   </View>
@@ -377,9 +377,9 @@ export const MoodVisualizationScreen: React.FC = () => {
                       />
                     </View>
                     <Text style={styles.moodFactorValue}>{Math.round(emotionData.calmness)}%</Text>
-                  </View>
-                </View>
-                
+          </View>
+        </View>
+        
                 <View style={styles.moodFactorRow}>
                   <View style={styles.moodFactor}>
                     <Text style={styles.moodFactorLabel}>Tension</Text>
@@ -421,19 +421,19 @@ export const MoodVisualizationScreen: React.FC = () => {
                 onPress={() => navigation.navigate('MoodDiary')}
               >
                 <Text style={styles.actionButtonText}>View Mood History</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
                 style={[styles.actionButton, styles.primaryButton]}
                 onPress={() => navigation.navigate('EmotionInput')}
-              >
+          >
                 <Text style={styles.primaryButtonText}>New Entry</Text>
-              </TouchableOpacity>
-            </View>
+          </TouchableOpacity>
+        </View>
           </Animated.View>
         </ScrollView>
       </Animated.View>
-    </SafeAreaView>
+      </SafeAreaView>
   );
 };
 
