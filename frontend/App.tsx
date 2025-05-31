@@ -13,6 +13,7 @@ import {
   initializeAppDirectories, 
   requestFileSystemPermissions 
 } from './utils/fileSystemUtils';
+import { ToastProvider } from './components/ui/Toast';
 
 // Keep the splash screen visible while we initialize the app
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -92,8 +93,10 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <AppNavigator />
-        <StatusBar style="auto" />
+        <ToastProvider>
+          <AppNavigator />
+          <StatusBar style="auto" />
+        </ToastProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
