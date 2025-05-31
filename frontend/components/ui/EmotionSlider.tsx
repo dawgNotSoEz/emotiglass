@@ -11,9 +11,19 @@ import {
   TextStyle,
   ColorValue
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+// Using regular View instead of LinearGradient since it's not available
 import theme from '../../constants/theme';
-import Slider from '@react-native-community/slider';
+// Using Animated.View instead of external slider
+// import Slider from '@react-native-community/slider';
+
+// Add missing theme color
+const customTheme = {
+  ...theme,
+  colors: {
+    ...theme.colors,
+    lightGray: '#e0e0e0' // Fallback for missing theme color
+  }
+};
 
 interface EmotionSliderProps {
   label: string;
@@ -48,11 +58,11 @@ export const EmotionSlider: React.FC<EmotionSliderProps> = ({
   step = 1,
   style,
   labelStyle,
-  gradientColors = theme.gradients.primary,
-  minimumTrackTintColor = theme.colors.primary,
-  maximumTrackTintColor = theme.colors.lightGray,
-  thumbTintColor = theme.colors.white,
-  colorGradient = [theme.colors.primary, theme.colors.secondary]
+  gradientColors = [customTheme.colors.primary, customTheme.colors.secondary],
+  minimumTrackTintColor = customTheme.colors.primary,
+  maximumTrackTintColor = customTheme.colors.lightGray,
+  thumbTintColor = customTheme.colors.text,
+  colorGradient = [customTheme.colors.primary, customTheme.colors.secondary]
 }) => {
   const [sliderWidth, setSliderWidth] = useState(width - 40);
   
@@ -110,39 +120,92 @@ export const EmotionSlider: React.FC<EmotionSliderProps> = ({
   });
   
   // Function to normalize value from 0-100 to 0-1
-  const normalizeValue = (val: number) => val / 100;
-  
-  return (
-    <View style={[styles.container, style]}>
-      <View style={styles.labelContainer}>
-        <Text style={[styles.label, labelStyle]}>{label}</Text>
-        <Text style={styles.valueText}>{Math.round(value)}</Text>
-      </View>
-      
-      <View style={styles.sliderContainer}>
-        <Slider
-          style={styles.slider}
-          value={normalizeValue(value)}
-          onValueChange={(val) => onValueChange(val * 100)}
-          minimumValue={0}
-          maximumValue={1}
-          minimumTrackTintColor={minimumTrackTintColor}
-          maximumTrackTintColor={maximumTrackTintColor}
-          thumbTintColor={thumbTintColor}
-        />
-        <LinearGradient
-          style={styles.gradient}
-          colors={colorGradient as unknown as readonly [ColorValue, ColorValue, ColorValue]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-        />
-      </View>
-      
-      <View style={styles.labelsContainer}>
-        <Text style={styles.minMaxLabel}>{minLabel}</Text>
-        <Text style={styles.minMaxLabel}>{maxLabel}</Text>
-      </View>
-    </View>
+  const normalizeValue = (val: number): number => val / 100;
+
+  // Create a custom slider instead of using the community slider
+  const renderCustomSlider = () => {
+    const thumbPosition = position.interpolate({
+      inputRange: [0, sliderWidth],
+      outputRange: [0, sliderWidth],
+      extrapolate: 'clamp',
+    });
+
+    return React.createElement(
+      View, 
+      { style: styles.sliderContainer },
+      // Track background
+      React.createElement(
+        View, 
+        { style: [styles.track, { backgroundColor: maximumTrackTintColor }] }
+      ),
+      // Active track
+      React.createElement(
+        View, 
+        { 
+          style: [
+            styles.activeTrack, 
+            { 
+              width: `${percentage}%`,
+              backgroundColor: minimumTrackTintColor 
+            }
+          ] 
+        }
+      ),
+      // Thumb
+      React.createElement(
+        Animated.View,
+        {
+          ...panResponder.panHandlers,
+          style: [
+            styles.thumb,
+            {
+              backgroundColor: thumbTintColor,
+              transform: [
+                { translateX: thumbPosition },
+                { scale: scale }
+              ],
+            }
+          ]
+        }
+      )
+    );
+  };
+
+  return React.createElement(
+    View, 
+    { style: [styles.container, style] },
+    // Label Container
+    React.createElement(
+      View, 
+      { style: styles.labelContainer },
+      React.createElement(
+        Text, 
+        { style: [styles.label, labelStyle] },
+        label
+      ),
+      React.createElement(
+        Text, 
+        { style: styles.valueText },
+        Math.round(value).toString()
+      )
+    ),
+    // Slider Container
+    renderCustomSlider(),
+    // Labels Container
+    React.createElement(
+      View, 
+      { style: styles.labelsContainer },
+      React.createElement(
+        Text, 
+        { style: styles.minMaxLabel },
+        minLabel
+      ),
+      React.createElement(
+        Text, 
+        { style: styles.minMaxLabel },
+        maxLabel
+      )
+    )
   );
 };
 
@@ -160,12 +223,12 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: theme.typography.fontSizes.md,
-    fontWeight: '700',
-    color: theme.colors.charcoal,
+    fontWeight: theme.typography.fontWeights.bold as '700',
+    color: theme.colors.text,
   },
   valueText: {
     fontSize: theme.typography.fontSizes.md,
-    fontWeight: '700',
+    fontWeight: theme.typography.fontWeights.bold as '700',
     color: theme.colors.primary,
   },
   sliderContainer: {
@@ -173,10 +236,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  slider: {
-    position: 'absolute',
+  track: {
+    height: TRACK_HEIGHT,
     width: '100%',
+    borderRadius: TRACK_HEIGHT / 2,
+  },
+  activeTrack: {
+    position: 'absolute',
+    height: TRACK_HEIGHT,
+    borderRadius: TRACK_HEIGHT / 2,
+    left: 0,
+  },
+  thumb: {
+    position: 'absolute',
+    width: THUMB_SIZE,
     height: THUMB_SIZE,
+    borderRadius: THUMB_SIZE / 2,
+    top: -(THUMB_SIZE - TRACK_HEIGHT) / 2,
+    left: 0,
+    marginLeft: -(THUMB_SIZE / 2),
+    ...theme.shadows.light,
   },
   gradient: {
     ...StyleSheet.absoluteFillObject,
@@ -189,7 +268,7 @@ const styles = StyleSheet.create({
   },
   minMaxLabel: {
     fontSize: theme.typography.fontSizes.sm,
-    color: theme.colors.darkGray,
+    color: theme.colors.textLight,
   },
 });
 

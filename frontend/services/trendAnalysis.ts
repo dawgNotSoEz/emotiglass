@@ -1,307 +1,320 @@
 import { MoodEntry, EmotionData } from '../types';
 
-export interface MoodTrend {
-  label: string;
-  data: number[];
-  color: string;
-}
-
-export interface MoodInsight {
-  type: 'positive' | 'neutral' | 'negative';
-  text: string;
-}
-
+/**
+ * Result of trend analysis containing data for visualization
+ */
 export interface TrendAnalysisResult {
-  trends: {
-    energy: MoodTrend;
-    calmness: MoodTrend;
-    tension: MoodTrend;
-  };
+  // Data for emotion frequency pie chart
   emotionFrequency: Record<string, number>;
-  timeOfDay: Record<string, number>;
-  dayOfWeek: Record<string, number>;
-  insights: MoodInsight[];
+  
+  // Data for emotion changes over time (line chart)
+  emotionTimeline: {
+    dates: string[];
+    emotions: Record<string, number[]>;
+  };
+  
+  // Data for input method usage (pie chart)
+  inputMethodUsage: Record<string, number>;
+  
+  // Data for energy/calmness/tension timeline (line chart)
+  moodFactorsTimeline: {
+    dates: string[];
+    energy: number[];
+    calmness: number[];
+    tension: number[];
+  };
+  
+  // Overall stats
+  stats: {
+    dominantEmotion: string;
+    averageEnergy: number;
+    averageCalmness: number;
+    averageTension: number;
+    entriesCount: number;
+  };
+  
+  // Weekly summary
+  weeklySummary: {
+    thisWeek: {
+      dominantEmotion: string;
+      entriesCount: number;
+      averageEnergy: number;
+    };
+    previousWeek: {
+      dominantEmotion: string;
+      entriesCount: number;
+      averageEnergy: number;
+    };
+    changePercentage: number;
+  };
 }
 
 /**
- * Analyzes mood entries to find trends over time
- * @param entries Array of mood entries to analyze
- * @returns Analysis of trends in the data
+ * Analyze mood entries for trends and generate visualization data
+ * @param entries Array of mood entries
+ * @returns Analysis result with visualization-ready data
  */
 export const analyzeTrends = (entries: MoodEntry[]): TrendAnalysisResult => {
-  if (entries.length === 0) {
-    return {
-      trends: {
-        energy: { label: 'Energy', data: [], color: '#3498db' },
-        calmness: { label: 'Calmness', data: [], color: '#2ecc71' },
-        tension: { label: 'Tension', data: [], color: '#e74c3c' }
-      },
-      emotionFrequency: {},
-      timeOfDay: {},
-      dayOfWeek: {},
-      insights: []
-    };
-  }
-  
-  // Sort entries by timestamp
+  // Sort entries by timestamp (oldest first for timeline data)
   const sortedEntries = [...entries].sort((a, b) => a.timestamp - b.timestamp);
   
-  // Calculate emotion distribution
-  const emotionDistribution = calculateEmotionDistribution(entries);
-  
-  // Calculate time of day distribution
-  const timeOfDayDistribution = calculateTimeOfDayDistribution(entries);
-  
-  // Calculate weekday distribution
-  const weekdayDistribution = calculateWeekdayDistribution(entries);
-  
-  // Calculate emotion parameters
-  const emotionParameters = calculateEmotionParameters(entries);
-  
-  // Generate insights
-  const insights = generateInsights(
-    sortedEntries,
-    emotionDistribution,
-    timeOfDayDistribution,
-    weekdayDistribution
-  ).map(text => ({
-    type: determineInsightType(text),
-    text
-  }));
-  
-  // Find overall dominant emotion
-  const dominantEmotion = Object.entries(emotionDistribution)
-    .reduce((max, [emotion, count]) => 
-      count > max.count ? { emotion, count } : max, 
-      { emotion: 'neutral', count: 0 }
-    ).emotion;
-  
-  // Create trend data
-  const trends = {
-    energy: {
-      label: 'Energy',
-      data: sortedEntries.map(entry => entry.emotions.energy || 50),
-      color: '#3498db'
+  // Initialize result
+  const result: TrendAnalysisResult = {
+    emotionFrequency: {},
+    emotionTimeline: {
+      dates: [],
+      emotions: {},
     },
-    calmness: {
-      label: 'Calmness',
-      data: sortedEntries.map(entry => entry.emotions.calmness || 50),
-      color: '#2ecc71'
+    inputMethodUsage: {
+      sliders: 0,
+      drawing: 0,
+      voice: 0,
+      face: 0,
     },
-    tension: {
-      label: 'Tension',
-      data: sortedEntries.map(entry => entry.emotions.tension || 50),
-      color: '#e74c3c'
-    }
+    moodFactorsTimeline: {
+      dates: [],
+      energy: [],
+      calmness: [],
+      tension: [],
+    },
+    stats: {
+      dominantEmotion: 'neutral',
+      averageEnergy: 0,
+      averageCalmness: 0,
+      averageTension: 0,
+      entriesCount: entries.length,
+    },
+    weeklySummary: {
+      thisWeek: {
+        dominantEmotion: 'neutral',
+        entriesCount: 0,
+        averageEnergy: 0,
+      },
+      previousWeek: {
+        dominantEmotion: 'neutral',
+        entriesCount: 0,
+        averageEnergy: 0,
+      },
+      changePercentage: 0,
+    },
   };
   
-  return {
-    trends,
-    emotionFrequency: emotionDistribution,
-    timeOfDay: timeOfDayDistribution,
-    dayOfWeek: weekdayDistribution,
-    insights
-  };
-};
-
-/**
- * Calculate distribution of emotions across entries
- */
-const calculateEmotionDistribution = (entries: MoodEntry[]) => {
-  const distribution: Record<string, number> = {
-    joy: 0,
-    sadness: 0,
-    anger: 0,
-    fear: 0,
-    surprise: 0,
-    disgust: 0,
-    contentment: 0,
-    neutral: 0
-  };
+  // Initialize emotion types for tracking
+  const emotionTypes = [
+    'joy', 'sadness', 'anger', 'fear', 
+    'surprise', 'disgust', 'contentment', 'neutral'
+  ];
   
-  entries.forEach(entry => {
-    distribution[entry.dominantEmotion] = (distribution[entry.dominantEmotion] || 0) + 1;
+  // Initialize emotion frequency
+  emotionTypes.forEach(emotion => {
+    result.emotionFrequency[emotion] = 0;
+    result.emotionTimeline.emotions[emotion] = [];
   });
   
-  return distribution;
-};
-
-/**
- * Calculate distribution of entries by time of day
- */
-const calculateTimeOfDayDistribution = (entries: MoodEntry[]) => {
-  const distribution: Record<string, number> = {
-    morning: 0,   // 5:00 - 11:59
-    afternoon: 0, // 12:00 - 16:59
-    evening: 0,   // 17:00 - 20:59
-    night: 0      // 21:00 - 4:59
-  };
+  // Process entries for analysis
+  let totalEnergy = 0;
+  let totalCalmness = 0;
+  let totalTension = 0;
   
-  entries.forEach(entry => {
-    const date = new Date(entry.timestamp);
-    const hour = date.getHours();
+  // Create map of dates for timeline data
+  const dateMap = new Map<string, {
+    date: string;
+    emotions: Record<string, number>;
+    energy: number;
+    calmness: number;
+    tension: number;
+    count: number;
+  }>();
+  
+  // Process each entry
+  sortedEntries.forEach(entry => {
+    // Count dominant emotions for frequency
+    result.emotionFrequency[entry.dominantEmotion] = 
+      (result.emotionFrequency[entry.dominantEmotion] || 0) + 1;
     
-    if (hour >= 5 && hour < 12) {
-      distribution.morning += 1;
-    } else if (hour >= 12 && hour < 17) {
-      distribution.afternoon += 1;
-    } else if (hour >= 17 && hour < 21) {
-      distribution.evening += 1;
-    } else {
-      distribution.night += 1;
-    }
-  });
-  
-  return distribution;
-};
-
-/**
- * Calculate distribution of entries by weekday
- */
-const calculateWeekdayDistribution = (entries: MoodEntry[]) => {
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const distribution: Record<string, number> = {
-    Sunday: 0,
-    Monday: 0,
-    Tuesday: 0,
-    Wednesday: 0,
-    Thursday: 0,
-    Friday: 0,
-    Saturday: 0
-  };
-  
-  entries.forEach(entry => {
+    // Count input methods
+    result.inputMethodUsage[entry.source] = 
+      (result.inputMethodUsage[entry.source] || 0) + 1;
+    
+    // Track mood factors for averages
+    totalEnergy += entry.emotions.energy;
+    totalCalmness += entry.emotions.calmness;
+    totalTension += entry.emotions.tension;
+    
+    // Group by date for timeline data
     const date = new Date(entry.timestamp);
-    const day = days[date.getDay()];
-    distribution[day] += 1;
+    const dateString = date.toISOString().split('T')[0]; // YYYY-MM-DD
+    
+    if (!dateMap.has(dateString)) {
+      const dateData = {
+        date: dateString,
+        emotions: {} as Record<string, number>,
+        energy: 0,
+        calmness: 0,
+        tension: 0,
+        count: 0,
+      };
+      
+      // Initialize emotions count for this date
+      emotionTypes.forEach(emotion => {
+        dateData.emotions[emotion] = 0;
+      });
+      
+      dateMap.set(dateString, dateData);
+    }
+    
+    // Update date data
+    const dateData = dateMap.get(dateString)!;
+    dateData.emotions[entry.dominantEmotion] += 1;
+    dateData.energy += entry.emotions.energy;
+    dateData.calmness += entry.emotions.calmness;
+    dateData.tension += entry.emotions.tension;
+    dateData.count += 1;
   });
   
-  return distribution;
-};
-
-/**
- * Calculate average emotion parameters
- */
-const calculateEmotionParameters = (entries: MoodEntry[]) => {
-  const totalEmotions: EmotionData = {
-    joy: 0,
-    sadness: 0,
-    anger: 0,
-    fear: 0,
-    surprise: 0,
-    disgust: 0,
-    contentment: 0,
-    neutral: 0,
-    energy: 0,
-    calmness: 0,
-    tension: 0
-  };
+  // Calculate averages for the stats
+  if (entries.length > 0) {
+    result.stats.averageEnergy = totalEnergy / entries.length;
+    result.stats.averageCalmness = totalCalmness / entries.length;
+    result.stats.averageTension = totalTension / entries.length;
+    
+    // Find dominant emotion overall
+    let maxCount = 0;
+    Object.entries(result.emotionFrequency).forEach(([emotion, count]) => {
+      if (count > maxCount) {
+        maxCount = count;
+        result.stats.dominantEmotion = emotion;
+      }
+    });
+  }
   
-  entries.forEach(entry => {
-    Object.keys(totalEmotions).forEach(key => {
-      const emotionKey = key as keyof EmotionData;
-      totalEmotions[emotionKey] += entry.emotions[emotionKey];
+  // Convert date map to timeline data
+  const sortedDates = Array.from(dateMap.keys()).sort();
+  result.emotionTimeline.dates = sortedDates;
+  
+  // Calculate emotion percentages for each date
+  sortedDates.forEach(dateString => {
+    const dateData = dateMap.get(dateString)!;
+    
+    // Average mood factors for this date
+    result.moodFactorsTimeline.dates.push(dateString);
+    result.moodFactorsTimeline.energy.push(dateData.energy / dateData.count);
+    result.moodFactorsTimeline.calmness.push(dateData.calmness / dateData.count);
+    result.moodFactorsTimeline.tension.push(dateData.tension / dateData.count);
+    
+    // Emotion values for each date (as percentages)
+    emotionTypes.forEach(emotion => {
+      const percentage = (dateData.emotions[emotion] / dateData.count) * 100;
+      result.emotionTimeline.emotions[emotion].push(percentage);
     });
   });
   
-  // Calculate averages
-  const averageEmotions: EmotionData = { ...totalEmotions };
-  Object.keys(averageEmotions).forEach(key => {
-    const emotionKey = key as keyof EmotionData;
-    averageEmotions[emotionKey] /= entries.length;
+  // Calculate weekly summary
+  const now = Date.now();
+  const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
+  const twoWeeksAgo = now - 14 * 24 * 60 * 60 * 1000;
+  
+  const thisWeekEntries = entries.filter(entry => entry.timestamp >= oneWeekAgo);
+  const prevWeekEntries = entries.filter(entry => 
+    entry.timestamp >= twoWeeksAgo && entry.timestamp < oneWeekAgo
+  );
+  
+  // This week stats
+  if (thisWeekEntries.length > 0) {
+    const thisWeekEmotions: Record<string, number> = {};
+    let thisWeekEnergy = 0;
+    
+    thisWeekEntries.forEach(entry => {
+      thisWeekEmotions[entry.dominantEmotion] = (thisWeekEmotions[entry.dominantEmotion] || 0) + 1;
+      thisWeekEnergy += entry.emotions.energy;
+    });
+    
+    let maxCount = 0;
+    Object.entries(thisWeekEmotions).forEach(([emotion, count]) => {
+      if (count > maxCount) {
+        maxCount = count;
+        result.weeklySummary.thisWeek.dominantEmotion = emotion;
+      }
+    });
+    
+    result.weeklySummary.thisWeek.entriesCount = thisWeekEntries.length;
+    result.weeklySummary.thisWeek.averageEnergy = thisWeekEnergy / thisWeekEntries.length;
+  }
+  
+  // Previous week stats
+  if (prevWeekEntries.length > 0) {
+    const prevWeekEmotions: Record<string, number> = {};
+    let prevWeekEnergy = 0;
+    
+    prevWeekEntries.forEach(entry => {
+      prevWeekEmotions[entry.dominantEmotion] = (prevWeekEmotions[entry.dominantEmotion] || 0) + 1;
+      prevWeekEnergy += entry.emotions.energy;
+    });
+    
+    let maxCount = 0;
+    Object.entries(prevWeekEmotions).forEach(([emotion, count]) => {
+      if (count > maxCount) {
+        maxCount = count;
+        result.weeklySummary.previousWeek.dominantEmotion = emotion;
+      }
+    });
+    
+    result.weeklySummary.previousWeek.entriesCount = prevWeekEntries.length;
+    result.weeklySummary.previousWeek.averageEnergy = prevWeekEnergy / prevWeekEntries.length;
+  }
+  
+  // Calculate change percentage in energy level
+  if (result.weeklySummary.previousWeek.averageEnergy > 0 && result.weeklySummary.thisWeek.averageEnergy > 0) {
+    const change = ((result.weeklySummary.thisWeek.averageEnergy - result.weeklySummary.previousWeek.averageEnergy) / 
+      result.weeklySummary.previousWeek.averageEnergy) * 100;
+    
+    result.weeklySummary.changePercentage = Number(change.toFixed(1));
+  }
+  
+  return result;
+};
+
+/**
+ * Generate formatted data for charts from trend analysis
+ * @param trendData Trend analysis result
+ * @returns Formatted data ready for charts
+ */
+export const prepareChartData = (trendData: TrendAnalysisResult) => {
+  // Prepare pie chart data for emotion frequency
+  const emotionFrequencyData = Object.entries(trendData.emotionFrequency).map(([name, value]) => ({
+    name,
+    value,
+  })).filter(item => item.value > 0);
+  
+  // Prepare pie chart data for input method usage
+  const inputMethodData = Object.entries(trendData.inputMethodUsage).map(([name, value]) => ({
+    name,
+    value,
+  })).filter(item => item.value > 0);
+  
+  // Prepare line chart data for mood factors
+  const moodFactorsData = trendData.moodFactorsTimeline.dates.map((date, index) => ({
+    date,
+    energy: trendData.moodFactorsTimeline.energy[index],
+    calmness: trendData.moodFactorsTimeline.calmness[index],
+    tension: trendData.moodFactorsTimeline.tension[index],
+  }));
+  
+  // Prepare line chart data for emotions over time
+  const emotionTimelineData = trendData.emotionTimeline.dates.map((date, index) => {
+    const entry: any = { date };
+    
+    Object.entries(trendData.emotionTimeline.emotions).forEach(([emotion, values]) => {
+      entry[emotion] = values[index];
+    });
+    
+    return entry;
   });
   
-  return averageEmotions;
-};
-
-/**
- * Generate insights based on the analyzed data
- */
-const generateInsights = (
-  entries: MoodEntry[],
-  emotionDistribution: Record<string, number>,
-  timeOfDayDistribution: Record<string, number>,
-  weekdayDistribution: Record<string, number>
-) => {
-  const insights: string[] = [];
-  
-  // Most common emotion
-  const dominantEmotion = Object.entries(emotionDistribution)
-    .reduce((max, [emotion, count]) => 
-      count > max.count ? { emotion, count } : max, 
-      { emotion: '', count: 0 }
-    );
-  
-  if (dominantEmotion.emotion) {
-    insights.push(`Your most common emotion is ${dominantEmotion.emotion}.`);
-  }
-  
-  // Time of day patterns
-  const mostActiveTime = Object.entries(timeOfDayDistribution)
-    .reduce((max, [time, count]) => 
-      count > max.count ? { time, count } : max, 
-      { time: '', count: 0 }
-    );
-  
-  if (mostActiveTime.time) {
-    insights.push(`You tend to record your emotions most often during the ${mostActiveTime.time}.`);
-  }
-  
-  // Weekday patterns
-  const mostActiveDay = Object.entries(weekdayDistribution)
-    .reduce((max, [day, count]) => 
-      count > max.count ? { day, count } : max, 
-      { day: '', count: 0 }
-    );
-  
-  if (mostActiveDay.day) {
-    insights.push(`${mostActiveDay.day} is when you record your emotions most frequently.`);
-  }
-  
-  // Emotion trends over time
-  if (entries.length >= 3) {
-    const firstHalf = entries.slice(0, Math.floor(entries.length / 2));
-    const secondHalf = entries.slice(Math.floor(entries.length / 2));
-    
-    const firstHalfPositive = firstHalf.filter(e => 
-      e.dominantEmotion === 'joy' || e.dominantEmotion === 'contentment'
-    ).length / firstHalf.length;
-    
-    const secondHalfPositive = secondHalf.filter(e => 
-      e.dominantEmotion === 'joy' || e.dominantEmotion === 'contentment'
-    ).length / secondHalf.length;
-    
-    const difference = secondHalfPositive - firstHalfPositive;
-    
-    if (difference > 0.2) {
-      insights.push('Your emotions have been becoming more positive over time.');
-    } else if (difference < -0.2) {
-      insights.push('Your emotions have been becoming less positive over time.');
-    }
-  }
-  
-  return insights;
-};
-
-/**
- * Determine the type of insight based on its content
- */
-const determineInsightType = (text: string): 'positive' | 'neutral' | 'negative' => {
-  const positiveWords = ['positive', 'improving', 'better', 'joy', 'contentment', 'happy'];
-  const negativeWords = ['negative', 'declining', 'worse', 'sad', 'anger', 'fear', 'disgust'];
-  
-  const lowerText = text.toLowerCase();
-  
-  if (positiveWords.some(word => lowerText.includes(word))) {
-    return 'positive';
-  } else if (negativeWords.some(word => lowerText.includes(word))) {
-    return 'negative';
-  }
-  
-  return 'neutral';
-};
-
-// Helper function to capitalize first letter
-const capitalizeFirstLetter = (string: string): string => {
-  return string.charAt(0).toUpperCase() + string.slice(1);
+  return {
+    emotionFrequencyData,
+    inputMethodData,
+    moodFactorsData,
+    emotionTimelineData,
+  };
 }; 

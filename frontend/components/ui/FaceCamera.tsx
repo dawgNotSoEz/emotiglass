@@ -1,115 +1,159 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
-  StyleSheet, 
   View, 
+  StyleSheet, 
   Text, 
   TouchableOpacity, 
-  ActivityIndicator 
+  Dimensions,
+  Platform,
+  ViewStyle
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, typography } from '../../constants/theme';
-import { FaceAnalysisResult } from '../../services/faceAnalysis';
+import theme from '../../constants/theme';
+
+// Types for face analysis result
+export interface FaceAnalysisResult {
+  faceDetected: boolean;
+  dominantEmotion: string;
+  emotionScores: Record<string, number>;
+  timestamp: number;
+}
 
 interface FaceCameraProps {
   onEmotionDetected: (result: FaceAnalysisResult) => void;
-  style?: any;
 }
 
-export const FaceCamera: React.FC<FaceCameraProps> = ({ 
-  onEmotionDetected,
-  style
-}) => {
-  const [isProcessing, setIsProcessing] = useState(false);
-  
-  // Simulate face detection
-  const simulateFaceDetection = () => {
-    if (isProcessing) return;
-    
-    setIsProcessing(true);
-    setTimeout(() => {
-      const mockResult: FaceAnalysisResult = {
-        faceDetected: true,
-        dominantEmotion: 'joy',
-        emotionScores: {
-          happy: 0.7,
-          sad: 0.1,
-          neutral: 0.1,
-          surprise: 0.05,
-          fear: 0.02,
-          disgust: 0.01,
-          anger: 0.02,
-          contentment: 0.4,
+function FaceCamera({ onEmotionDetected }: FaceCameraProps) {
+  // Camera states
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [type, setType] = useState<'front' | 'back'>('front');
+
+  // Request camera permissions
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      // Simulate permission for web
+      setHasPermission(true);
+    } else {
+      // For mobile platforms, you would request actual permissions
+      const requestPermissions = async () => {
+        try {
+          // Placeholder for actual permission request
+          const { status } = { status: 'granted' };
+          setHasPermission(status === 'granted');
+        } catch (error) {
+          console.error('Permission error:', error);
+          setHasPermission(false);
         }
       };
-      onEmotionDetected(mockResult);
-      setIsProcessing(false);
-    }, 1000);
+      requestPermissions();
+    }
+  }, []);
+
+  // Simulate face detection for web and mobile
+  const simulateFaceDetection = () => {
+    const emotions = [
+      'neutral', 'joy', 'sadness', 'anger', 
+      'surprise', 'fear', 'disgust', 'contentment'
+    ];
+    
+    const dominantEmotion = emotions[Math.floor(Math.random() * emotions.length)];
+    
+    const emotionScores: Record<string, number> = {};
+    emotions.forEach(emotion => {
+      emotionScores[emotion] = emotion === dominantEmotion 
+        ? Math.random() * 0.5 + 0.5 
+        : Math.random() * 0.5;
+    });
+
+    const result: FaceAnalysisResult = {
+      faceDetected: true,
+      dominantEmotion,
+      emotionScores,
+      timestamp: Date.now(),
+    };
+
+    onEmotionDetected(result);
   };
+
+  // Toggle camera type
+  const toggleCameraType = () => {
+    setType(current => current === 'back' ? 'front' : 'back');
+  };
+
+  // Render camera or permission request
+  if (hasPermission === null) {
+    return React.createElement(View, {});
+  }
   
-  return (
-    <View style={[styles.container, style]}>
-      <View style={styles.placeholderContainer}>
-        <Ionicons name="camera-outline" size={48} color={colors.textLight} />
-        <Text style={styles.infoText}>
-          Camera placeholder - implementation requires additional setup
-        </Text>
-        <Text style={styles.subText}>
-          Camera functionality requires expo-camera to be properly configured
-        </Text>
-        
-        <TouchableOpacity
-          style={[styles.simulateButton, { opacity: isProcessing ? 0.5 : 1 }]}
-          onPress={simulateFaceDetection}
-          disabled={isProcessing}
-        >
-          {isProcessing ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.simulateButtonText}>Simulate Face Detection</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    </View>
+  if (hasPermission === false) {
+    return React.createElement(
+      View, 
+      { style: styles.permissionContainer },
+      React.createElement(
+        Text,
+        { style: styles.permissionText },
+        'No access to camera'
+      )
+    );
+  }
+
+  return React.createElement(
+    View, 
+    { style: styles.container },
+    React.createElement(
+      View, 
+      { style: styles.camera },
+      React.createElement(
+        TouchableOpacity, 
+        {
+          style: styles.button, 
+          onPress: Platform.OS === 'web' ? simulateFaceDetection : toggleCameraType
+        },
+        React.createElement(
+          Text, 
+          { style: styles.buttonText },
+          Platform.OS === 'web' 
+            ? 'Simulate Face Detection' 
+            : 'Flip Camera'
+        )
+      )
+    )
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
-    borderRadius: 8,
-    overflow: 'hidden',
-    minHeight: 300,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  placeholderContainer: {
+  camera: {
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.background,
+  },
+  button: {
+    backgroundColor: theme.colors.primary,
+    padding: 15,
+    borderRadius: 10,
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+  },
+  permissionContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.lg,
-    backgroundColor: '#222',
+    backgroundColor: theme.colors.background,
   },
-  infoText: {
-    color: colors.textLight,
-    textAlign: 'center',
-    marginVertical: spacing.md,
-    fontSize: typography.fontSizes.md,
+  permissionText: {
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.text,
+    marginTop: theme.spacing.md,
+    fontWeight: '400' as const,
   },
-  subText: {
-    color: colors.textLight,
-    opacity: 0.7,
-    textAlign: 'center',
-    marginBottom: spacing.md,
-    fontSize: typography.fontSizes.sm,
-  },
-  simulateButton: {
-    backgroundColor: colors.secondary,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderRadius: 8,
-    marginTop: spacing.md,
-  },
-  simulateButtonText: {
-    color: '#fff',
-    fontSize: typography.fontSizes.md,
-  },
-}); 
+});
+
+export default FaceCamera; 

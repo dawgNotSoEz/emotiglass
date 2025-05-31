@@ -218,7 +218,7 @@ export const exportDrawingToMediaLibrary = async (uri: string): Promise<boolean>
 
 /**
  * Analyze drawing for emotional content
- * This is a placeholder that would normally use a ML model
+ * This is a simulation of emotion inference based on drawing patterns
  * @param drawingData Drawing paths as JSON string
  * @returns Emotion data based on the drawing
  */
@@ -227,34 +227,12 @@ export const analyzeDrawing = async (drawingData: string): Promise<Record<string
     // Parse drawing data
     const paths = JSON.parse(drawingData) as Path[];
     
-    // In a real app, this would use a machine learning model to analyze the drawing
-    // For now, we'll generate random emotion scores based on drawing characteristics
+    // Calculate drawing metrics for emotional inference
+    const drawingMetrics = calculateDrawingMetrics(paths);
+    console.log('[drawingService] Drawing metrics:', drawingMetrics);
     
-    // Simple heuristics (just for demonstration):
-    // - More strokes might indicate higher energy
-    // - More colors might indicate higher emotional complexity
-    // - Thicker lines might indicate stronger emotions
-    
-    const strokeCount = paths.length;
-    const uniqueColors = new Set(paths.map(path => path.color)).size;
-    const avgLineWidth = paths.reduce((sum, path) => sum + path.width, 0) / Math.max(1, paths.length);
-    
-    console.log(`[drawingService] Analyzing drawing: ${strokeCount} strokes, ${uniqueColors} colors, avg width: ${avgLineWidth}`);
-    
-    // Generate pseudo-random but somewhat consistent emotion scores
-    const emotions = {
-      joy: Math.min(0.1 + (uniqueColors * 0.15) + Math.random() * 0.2, 1),
-      sadness: Math.min(0.1 + (avgLineWidth * 0.03) + Math.random() * 0.2, 1),
-      anger: Math.min(0.1 + (strokeCount * 0.02) + Math.random() * 0.1, 1),
-      fear: Math.min(0.05 + Math.random() * 0.15, 1),
-      surprise: Math.min(0.1 + (uniqueColors * 0.1) + Math.random() * 0.2, 1),
-      disgust: Math.min(0.05 + Math.random() * 0.1, 1),
-      contentment: Math.min(0.1 + (1 / avgLineWidth) * 0.2 + Math.random() * 0.2, 1),
-      neutral: Math.min(0.1 + Math.random() * 0.2, 1),
-      energy: Math.min(30 + (strokeCount * 3) + (uniqueColors * 5) + Math.random() * 20, 100),
-      calmness: Math.min(30 + (1 / avgLineWidth) * 20 + Math.random() * 20, 100),
-      tension: Math.min(20 + (strokeCount * 2) + (avgLineWidth * 5) + Math.random() * 20, 100)
-    };
+    // Generate emotion values based on drawing metrics
+    const emotions = inferEmotionsFromMetrics(drawingMetrics);
     
     return emotions;
   } catch (error) {
@@ -275,4 +253,269 @@ export const analyzeDrawing = async (drawingData: string): Promise<Record<string
       tension: 50
     };
   }
+};
+
+/**
+ * Calculate metrics from drawing paths for emotional analysis
+ */
+interface DrawingMetrics {
+  strokeCount: number;         // Number of strokes
+  uniqueColors: number;        // Number of unique colors used
+  avgStrokeWidth: number;      // Average stroke width
+  avgStrokeLength: number;     // Average length of strokes
+  totalLength: number;         // Total length of all strokes
+  avgSpeed: number;            // Average drawing speed (estimated)
+  strokeDensity: number;       // Density of strokes in the drawing area
+  usedArea: number;            // Percentage of canvas area used
+  complexity: number;          // Complexity score based on turns and direction changes
+  curvature: number;           // Amount of curvature in the strokes
+  pressure: number;            // Estimated pressure (based on width variation)
+  dominantColors: string[];    // Most used colors
+}
+
+/**
+ * Calculate drawing metrics from paths
+ */
+const calculateDrawingMetrics = (paths: Path[]): DrawingMetrics => {
+  if (paths.length === 0) {
+    return {
+      strokeCount: 0,
+      uniqueColors: 0,
+      avgStrokeWidth: 0,
+      avgStrokeLength: 0,
+      totalLength: 0,
+      avgSpeed: 0,
+      strokeDensity: 0,
+      usedArea: 0,
+      complexity: 0,
+      curvature: 0,
+      pressure: 0,
+      dominantColors: []
+    };
+  }
+  
+  // Basic metrics
+  const strokeCount = paths.length;
+  const colors = paths.map(p => p.color);
+  const uniqueColors = new Set(colors).size;
+  const avgStrokeWidth = paths.reduce((sum, p) => sum + p.width, 0) / strokeCount;
+  
+  // Color frequency
+  const colorFrequency: Record<string, number> = {};
+  colors.forEach(color => {
+    colorFrequency[color] = (colorFrequency[color] || 0) + 1;
+  });
+  
+  const dominantColors = Object.entries(colorFrequency)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([color]) => color);
+  
+  // Calculate stroke lengths and bounding box
+  let totalLength = 0;
+  let minX = Number.MAX_VALUE;
+  let minY = Number.MAX_VALUE;
+  let maxX = Number.MIN_VALUE;
+  let maxY = Number.MIN_VALUE;
+  let totalDirectionChanges = 0;
+  let totalCurvature = 0;
+  
+  paths.forEach(path => {
+    // Stroke length
+    let pathLength = 0;
+    let directionChanges = 0;
+    
+    // Update bounding box
+    path.points.forEach(point => {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    });
+    
+    // Calculate path length and complexity
+    for (let i = 1; i < path.points.length; i++) {
+      const p1 = path.points[i - 1];
+      const p2 = path.points[i];
+      
+      // Distance between points
+      const segmentLength = Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+      pathLength += segmentLength;
+      
+      // Detect direction changes (for complexity)
+      if (i > 1) {
+        const p0 = path.points[i - 2];
+        const angle1 = Math.atan2(p1.y - p0.y, p1.x - p0.x);
+        const angle2 = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+        const angleDiff = Math.abs(angle2 - angle1);
+        
+        // If angle difference is significant, count as direction change
+        if (angleDiff > 0.3) { // ~17 degrees
+          directionChanges++;
+          totalCurvature += angleDiff;
+        }
+      }
+    }
+    
+    totalLength += pathLength;
+    totalDirectionChanges += directionChanges;
+  });
+  
+  const avgStrokeLength = totalLength / strokeCount;
+  const canvasArea = (maxX - minX) * (maxY - minY);
+  const usedArea = canvasArea > 0 ? (canvasArea / (1000 * 1000)) * 100 : 0; // Normalized to percentage of 1000x1000 canvas
+  
+  // More advanced metrics
+  const avgSpeed = avgStrokeLength / 5; // Simulated speed (lower = slower drawing)
+  const strokeDensity = totalLength / (canvasArea > 0 ? canvasArea : 1);
+  const complexity = totalDirectionChanges / strokeCount;
+  const curvature = totalCurvature / strokeCount;
+  
+  // Estimate pressure from width variation and stroke density
+  const widthVariation = Math.max(...paths.map(p => p.width)) - Math.min(...paths.map(p => p.width));
+  const pressure = Math.min(1, (avgStrokeWidth * widthVariation) / 10);
+  
+  return {
+    strokeCount,
+    uniqueColors,
+    avgStrokeWidth,
+    avgStrokeLength,
+    totalLength,
+    avgSpeed,
+    strokeDensity,
+    usedArea,
+    complexity,
+    curvature,
+    pressure,
+    dominantColors
+  };
+};
+
+/**
+ * Infer emotions from drawing metrics
+ */
+const inferEmotionsFromMetrics = (metrics: DrawingMetrics): Record<string, number> => {
+  // Initialize base emotions with neutral values
+  const emotions = {
+    joy: 0.1,
+    sadness: 0.1,
+    anger: 0.1,
+    fear: 0.1,
+    surprise: 0.1,
+    disgust: 0.1,
+    contentment: 0.1,
+    neutral: 0.5,
+    energy: 50,
+    calmness: 50,
+    tension: 50
+  };
+  
+  // No metrics = neutral emotions
+  if (metrics.strokeCount === 0) return emotions;
+  
+  // ----- Energy level inference -----
+  // High energy: fast strokes, many strokes, high pressure, high complexity
+  emotions.energy = Math.min(100, 
+    40 + 
+    (metrics.avgSpeed * 2) + 
+    Math.min(30, metrics.strokeCount * 2) + 
+    (metrics.pressure * 20) + 
+    (metrics.complexity * 10)
+  );
+  
+  // ----- Calmness level inference -----
+  // Calmness: inversely related to complexity, pressure, speed
+  emotions.calmness = Math.min(100, 
+    80 - 
+    (metrics.complexity * 15) - 
+    (metrics.pressure * 20) - 
+    (metrics.avgSpeed * 1.5) + 
+    (metrics.avgStrokeLength / 100 * 10)
+  );
+  
+  // ----- Tension level inference -----
+  // Tension: short strokes, high pressure, high complexity, high stroke density
+  emotions.tension = Math.min(100, 
+    30 + 
+    (metrics.strokeDensity * 10) + 
+    (100 - Math.min(100, metrics.avgStrokeLength)) * 0.3 + 
+    (metrics.pressure * 30) + 
+    (metrics.complexity * 10)
+  );
+  
+  // ----- Specific emotions inference -----
+  
+  // Joy: colorful, fluid strokes, medium-high energy
+  emotions.joy = Math.min(1.0, 
+    0.1 + 
+    (metrics.uniqueColors / 5 * 0.4) + 
+    (metrics.curvature * 0.2) + 
+    (emotions.energy / 100 * 0.3) - 
+    (emotions.tension / 100 * 0.2)
+  );
+  
+  // Anger: high pressure, sharp turns, high tension, less colorful
+  emotions.anger = Math.min(1.0, 
+    0.1 + 
+    (metrics.pressure * 0.4) + 
+    (metrics.complexity * 0.3) + 
+    (emotions.tension / 100 * 0.3) - 
+    (emotions.calmness / 100 * 0.2)
+  );
+  
+  // Sadness: slow, long strokes, low energy, low complexity
+  emotions.sadness = Math.min(1.0, 
+    0.1 + 
+    ((10 - Math.min(10, metrics.avgSpeed)) * 0.05) + 
+    ((100 - emotions.energy) / 100 * 0.3) + 
+    ((100 - Math.min(100, metrics.complexity * 50)) / 100 * 0.3)
+  );
+  
+  // Fear: erratic strokes, high pressure, high complexity
+  emotions.fear = Math.min(1.0, 
+    0.1 + 
+    (metrics.pressure * 0.3) + 
+    (metrics.complexity * 0.4) + 
+    (emotions.tension / 100 * 0.3) - 
+    (emotions.calmness / 100 * 0.2)
+  );
+  
+  // Contentment: balanced, medium stroke length, medium-low energy
+  emotions.contentment = Math.min(1.0, 
+    0.1 + 
+    (emotions.calmness / 100 * 0.5) + 
+    ((100 - emotions.tension) / 100 * 0.3) + 
+    ((metrics.avgStrokeLength > 50 && metrics.avgStrokeLength < 200) ? 0.3 : 0)
+  );
+  
+  // Surprise: unique colors, varied strokes, high energy
+  emotions.surprise = Math.min(1.0, 
+    0.1 + 
+    (metrics.uniqueColors / 5 * 0.3) + 
+    (emotions.energy / 100 * 0.4) + 
+    (metrics.complexity * 0.2)
+  );
+  
+  // Disgust: sharp turns, high pressure, varied stroke width
+  emotions.disgust = Math.min(1.0, 
+    0.1 + 
+    (metrics.complexity * 0.3) + 
+    (metrics.pressure * 0.3) + 
+    ((metrics.avgStrokeWidth > 5) ? 0.2 : 0)
+  );
+  
+  // Reduce neutral based on strength of other emotions
+  const emotionSum = 
+    emotions.joy + 
+    emotions.sadness + 
+    emotions.anger + 
+    emotions.fear + 
+    emotions.surprise + 
+    emotions.disgust + 
+    emotions.contentment;
+  
+  emotions.neutral = Math.max(0.1, 1 - (emotionSum / 7));
+  
+  // Return the inferred emotions
+  return emotions;
 }; 
