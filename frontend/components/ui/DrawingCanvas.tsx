@@ -10,7 +10,6 @@ import {
   ViewStyle,
   TextStyle,
   StyleProp,
-  GestureResponderEvent,
   Platform
 } from 'react-native';
 import Svg, { Path, G } from 'react-native-svg';
@@ -21,7 +20,7 @@ import * as MediaLibrary from 'expo-media-library';
 import ViewShot from 'react-native-view-shot';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { Canvas, Path as SkiaPath, Skia, PaintStyle } from '@shopify/react-native-skia';
+import { Canvas, Path as SkiaPath, Skia, PaintStyle, CanvasRef } from '@shopify/react-native-skia';
 
 /**
  * Type definitions for Drawing Canvas component
@@ -92,6 +91,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   
   // Refs
   const viewShotRef = useRef<ViewShot>(null);
+  const canvasRef = useRef<CanvasRef>(null);
   
   // Color and width options
   const colorOptions: ColorOption[] = [
@@ -104,54 +104,122 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   
   const strokeWidths: StrokeWidthOption[] = [1, 2, 4, 6, 8];
   
-  // Helper: Create Skia Path from points
+  // Helper: Create Skia Path from points with smoothing
   const createSkiaPath = (points: Point[]): SkPath => {
     const skiaPath = Skia.Path.Make();
     if (points.length === 0) return skiaPath;
-    skiaPath.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) {
-      skiaPath.lineTo(points[i].x, points[i].y);
-    }
-    // If only one point, draw a dot
+    
+    // For a single point, draw a dot
     if (points.length === 1) {
-      skiaPath.addCircle(points[0].x, points[0].y, currentWidth / 2);
+      const p = points[0];
+      skiaPath.addCircle(p.x, p.y, currentWidth / 2);
+      return skiaPath;
     }
+    
+    // For multiple points, create a smooth path
+    skiaPath.moveTo(points[0].x, points[0].y);
+    
+    // Use quadratic curves for smoother lines
+    for (let i = 1; i < points.length; i++) {
+      const p1 = points[i - 1];
+      const p2 = points[i];
+      
+      // For two points, just draw a line
+      if (points.length === 2) {
+        skiaPath.lineTo(p2.x, p2.y);
+      } else {
+        // For more points, use quadratic curves for smoothing
+        // Calculate control point (midpoint)
+        const cpX = (p1.x + p2.x) / 2;
+        const cpY = (p1.y + p2.y) / 2;
+        
+        // Draw quadratic curve
+        if (i === 1) {
+          // First segment
+          skiaPath.lineTo(cpX, cpY);
+        } else {
+          // Middle segments
+          skiaPath.quadTo(p1.x, p1.y, cpX, cpY);
+        }
+        
+        // Last segment
+        if (i === points.length - 1) {
+          skiaPath.lineTo(p2.x, p2.y);
+        }
+      }
+    }
+    
     return skiaPath;
   };
   
-  // Pan gesture for drawing
+  // Pan gesture for drawing with improved sensitivity
   const panGesture = Gesture.Pan()
     .runOnJS(true)
+    .minDistance(0) // Respond to the smallest movements
+    .maxPointers(1) // Only track a single touch
+    .simultaneousWithExternalGesture() // Allow simultaneous gestures
     .onStart((e) => {
-      setCurrentPoints([{ x: e.x, y: e.y }]);
-        setIsDrawing(true);
+      console.log('Drawing started at:', e.x, e.y);
+      const newPoint = { x: e.x, y: e.y };
+      setCurrentPoints([newPoint]);
+      setIsDrawing(true);
       if (onDrawingStart) onDrawingStart();
     })
     .onUpdate((e) => {
-      setCurrentPoints((prev) => [...prev, { x: e.x, y: e.y }]);
+      if (!isDrawing) return;
+      console.log('Drawing update at:', e.x, e.y);
+      // Add point with throttling to prevent too many points
+      const lastPoint = currentPoints[currentPoints.length - 1];
+      const newPoint = { x: e.x, y: e.y };
+      
+      // Only add point if it's far enough from the last point (reduces unnecessary points)
+      const distance = Math.sqrt(
+        Math.pow(newPoint.x - lastPoint.x, 2) + 
+        Math.pow(newPoint.y - lastPoint.y, 2)
+      );
+      
+      // Minimum distance between points based on stroke width
+      const minDistance = Math.max(1, currentWidth / 4);
+      
+      if (distance >= minDistance) {
+        setCurrentPoints(prev => [...prev, newPoint]);
+      }
     })
     .onEnd(() => {
+      console.log('Drawing ended with points:', currentPoints.length);
       if (currentPoints.length === 0) {
         setIsDrawing(false);
-        setCurrentPoints([]);
         return;
       }
+      
+      // Create a new path with current settings
       const skiaPath = createSkiaPath(currentPoints);
-        const newPath: DrawingPath = {
+      const newPath: DrawingPath = {
         id: Date.now().toString(),
         points: currentPoints,
-          color: currentColor,
-          width: currentWidth,
+        color: currentColor,
+        width: currentWidth,
         skiaPath,
       };
-      setPaths((prev) => {
+      
+      setPaths(prev => {
         const updated = [...prev, newPath];
         if (onDrawingComplete) onDrawingComplete(JSON.stringify(updated));
         return updated;
       });
+      
+      // Reset current points and drawing state
       setCurrentPoints([]);
-        setIsDrawing(false);
+      setIsDrawing(false);
       if (onDrawingEnd) onDrawingEnd();
+    })
+    .onFinalize(() => {
+      // Ensure we clean up if the gesture is interrupted
+      if (isDrawing) {
+        setIsDrawing(false);
+        setCurrentPoints([]);
+        if (onDrawingEnd) onDrawingEnd();
+      }
     });
   
   // Undo the last path
@@ -165,18 +233,20 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   
   // Clear the canvas
   const handleClear = useCallback(() => {
-            setPaths([]);
+    setPaths([]);
     setCurrentPoints([]);
     if (onDrawingComplete) onDrawingComplete(JSON.stringify([]));
   }, [onDrawingComplete]);
   
   // Handle color change
   const handleColorChange = useCallback((color: string) => {
+    console.log('Color changed to:', color);
     setCurrentColor(color);
   }, []);
   
   // Handle stroke width change
   const handleWidthChange = useCallback((width: number) => {
+    console.log('Width changed to:', width);
     setCurrentWidth(width);
   }, []);
   
@@ -274,10 +344,26 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       <ViewShot
         ref={viewShotRef}
         options={{ format: 'png', quality: 0.9 }}
-        style={{ width: typeof width === 'number' ? width : Dimensions.get('window').width - 32, height: typeof height === 'number' ? height : 300, backgroundColor: '#FFFFFF' }}
+        style={[
+          styles.canvasContainer,
+          { 
+            width: typeof width === 'number' ? width : Dimensions.get('window').width - 32, 
+            height: typeof height === 'number' ? height : 300 
+          }
+        ]}
       >
         <GestureDetector gesture={panGesture}>
-          <Canvas style={{ width: typeof width === 'number' ? width : Dimensions.get('window').width - 32, height: typeof height === 'number' ? height : 300 } as any}>
+          <Canvas 
+            ref={canvasRef}
+            style={[
+              styles.canvas,
+              { 
+                width: typeof width === 'number' ? width : Dimensions.get('window').width - 32, 
+                height: typeof height === 'number' ? height : 300 
+              },
+              isDrawing && styles.activeCanvas // Add highlighted border when drawing
+            ]}
+          >
             {/* Render completed paths */}
             {paths.map((path) => (
               <SkiaPath
@@ -296,6 +382,14 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           </Canvas>
         </GestureDetector>
       </ViewShot>
+      
+      {/* Empty State Overlay */}
+      {paths.length === 0 && !isDrawing && (
+        <View style={styles.emptyCanvasOverlay}>
+          <Text style={styles.emptyCanvasText}>Draw your emotions here</Text>
+          <Ionicons name="pencil-outline" size={32} color="rgba(0, 0, 0, 0.2)" />
+        </View>
+      )}
       
       {/* Toolbar */}
       <View style={styles.toolbar}>
@@ -404,16 +498,29 @@ const styles = StyleSheet.create({
     elevation: 3,
     alignItems: 'center',
     position: 'relative',
+    flex: 1, // Take up available space
+  },
+  canvasContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    overflow: 'hidden',
+    flex: 1, // Take up available space
   },
   canvas: {
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
-    flex: 1,
+    flex: 1, // Take up available space
+  },
+  activeCanvas: {
+    borderWidth: 2,
+    borderColor: themeColors.primary,
+    borderStyle: 'dashed',
   },
   toolbar: {
     padding: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: themeColors.border,
+    width: '100%', // Ensure toolbar takes full width
   },
   toolSection: {
     flexDirection: 'row',
@@ -499,16 +606,18 @@ const styles = StyleSheet.create({
   },
   emptyCanvasOverlay: {
     position: 'absolute',
-    top: 50,
+    top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
+    bottom: 100, // Leave space for toolbar
     justifyContent: 'center',
     alignItems: 'center',
+    pointerEvents: 'none', // Allow touch events to pass through
   },
   emptyCanvasText: {
     color: 'rgba(0, 0, 0, 0.2)',
-    fontSize: typography.fontSizes.xl,
-    fontWeight: typography.fontWeights.bold,
+    fontSize: typography.fontSizes.lg,
+    fontWeight: typography.fontWeights.medium,
+    marginBottom: spacing.sm,
   },
 }); 
