@@ -36,6 +36,7 @@ export interface MoodEntry {
   confidence: number;
   notes?: string;
   source: 'sliders' | 'drawing' | 'voice' | 'face';
+  drawingData?: string; // JSON string of drawing paths for thumbnails
 }
 
 // Navigation types
