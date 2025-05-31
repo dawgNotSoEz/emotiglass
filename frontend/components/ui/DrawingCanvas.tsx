@@ -322,20 +322,99 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     }
   };
   
-  // Render current path as SkiaPath
+  // Render current path as SkiaPath with preview effect
   const renderCurrentSkiaPath = () => {
     if (currentPoints.length === 0) return null;
+    
     const skiaPath = createSkiaPath(currentPoints);
+    
+    // Return both the main path and the preview effect
     return (
-      <SkiaPath
-        path={skiaPath}
-        color={currentColor}
-        strokeWidth={currentWidth}
-        style="stroke"
-        strokeCap="round"
-        strokeJoin="round"
-      />
+      <>
+        {/* Main stroke */}
+        <SkiaPath
+          path={skiaPath}
+          color={currentColor}
+          strokeWidth={currentWidth}
+          style="stroke"
+          strokeCap="round"
+          strokeJoin="round"
+        />
+        
+        {/* Glow effect for better visual feedback */}
+        <SkiaPath
+          path={skiaPath}
+          color={currentColor}
+          style="stroke"
+          strokeWidth={currentWidth + 4}
+          strokeCap="round"
+          strokeJoin="round"
+          opacity={0.2}
+        />
+        
+        {/* Brush position indicator */}
+        {isDrawing && currentPoints.length > 0 && (() => {
+          const lastPoint = currentPoints[currentPoints.length - 1];
+          const path = Skia.Path.Make();
+          path.addCircle(lastPoint.x, lastPoint.y, currentWidth + 2);
+          
+          return (
+            <SkiaPath
+              path={path}
+              color={currentColor}
+              style="stroke"
+              strokeWidth={2}
+            />
+          );
+        })()}
+      </>
     );
+  };
+  
+  // Add a function to render grid lines
+  const renderGridLines = () => {
+    const gridSize = 20;
+    const canvasWidth = typeof width === 'number' ? width : Dimensions.get('window').width - 32;
+    const canvasHeight = typeof height === 'number' ? height : 300;
+    
+    const horizontalLines = [];
+    const verticalLines = [];
+    
+    // Create horizontal grid lines
+    for (let y = gridSize; y < canvasHeight; y += gridSize) {
+      const path = Skia.Path.Make();
+      path.moveTo(0, y);
+      path.lineTo(canvasWidth, y);
+      
+      horizontalLines.push(
+        <SkiaPath
+          key={`h-${y}`}
+          path={path}
+          color="rgba(0, 0, 0, 0.05)"
+          style="stroke"
+          strokeWidth={1}
+        />
+      );
+    }
+    
+    // Create vertical grid lines
+    for (let x = gridSize; x < canvasWidth; x += gridSize) {
+      const path = Skia.Path.Make();
+      path.moveTo(x, 0);
+      path.lineTo(x, canvasHeight);
+      
+      verticalLines.push(
+        <SkiaPath
+          key={`v-${x}`}
+          path={path}
+          color="rgba(0, 0, 0, 0.05)"
+          style="stroke"
+          strokeWidth={1}
+        />
+      );
+    }
+    
+    return [...horizontalLines, ...verticalLines];
   };
   
   return (
@@ -364,6 +443,9 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
               isDrawing && styles.activeCanvas // Add highlighted border when drawing
             ]}
           >
+            {/* Grid lines for better spatial reference */}
+            {renderGridLines()}
+            
             {/* Render completed paths */}
             {paths.map((path) => (
               <SkiaPath
@@ -377,7 +459,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
               />
             ))}
             
-            {/* Render current path */}
+            {/* Render current path with effects */}
             {renderCurrentSkiaPath()}
           </Canvas>
         </GestureDetector>
@@ -419,69 +501,98 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
             />
           </TouchableOpacity>
           
-            <TouchableOpacity 
+          <TouchableOpacity 
             style={styles.toolButton}
             onPress={saveToMediaLibrary}
             disabled={paths.length === 0 || isExporting}
-            >
+          >
             <Ionicons
               name="save-outline"
               size={24}
               color={paths.length === 0 ? themeColors.textLight : themeColors.primary}
             />
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
+        </View>
         
-        {/* Color Picker */}
-          <View style={styles.colorPickerContainer}>
-          <Text style={styles.toolbarLabel}>Color</Text>
-            <View style={styles.colorPicker}>
-              {colorOptions.map((color) => (
-                <TouchableOpacity
-                  key={color}
-                  style={[
-                    styles.colorButton,
-                    { backgroundColor: color },
-                    currentColor === color && styles.selectedColor,
-                  ]}
-                  onPress={() => handleColorChange(color)}
-                />
-              ))}
-            </View>
-          </View>
-          
-        {/* Stroke Width Picker */}
-          <View style={styles.widthPickerContainer}>
-          <Text style={styles.toolbarLabel}>Stroke Width</Text>
-            <View style={styles.widthPicker}>
-              {strokeWidths.map((width) => (
-                <TouchableOpacity
-                  key={width}
-                  style={[
-                    styles.widthButton,
-                    currentWidth === width && styles.selectedWidth,
-                  ]}
-                  onPress={() => handleWidthChange(width)}
-                >
-                  <View
-                    style={[
-                      styles.widthIndicator,
-                      { height: width, backgroundColor: currentColor },
-                    ]}
-                  />
-                </TouchableOpacity>
-              ))}
-          </View>
+        {/* Add Clear Button */}
+        <TouchableOpacity
+          style={[styles.clearButton, paths.length === 0 && styles.disabledButton]}
+          onPress={handleClear}
+          disabled={paths.length === 0}
+        >
+          <Text style={[styles.clearButtonText, paths.length === 0 && styles.disabledText]}>
+            Clear Drawing
+          </Text>
+        </TouchableOpacity>
+        
+        {/* Export Button */}
+        <TouchableOpacity
+          style={[styles.exportButton, paths.length === 0 && styles.disabledButton]}
+          onPress={async () => {
+            setIsExporting(true);
+            try {
+              const base64 = await exportAsBase64();
+              if (base64 && onDrawingComplete) {
+                onDrawingComplete(JSON.stringify(paths));
+              }
+            } catch (error) {
+              console.error('Failed to export drawing:', error);
+              if (onError) onError(error as Error);
+            } finally {
+              setIsExporting(false);
+            }
+          }}
+          disabled={paths.length === 0 || isExporting}
+        >
+          {isExporting ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.exportButtonText}>Done</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+      
+      {/* Color Picker */}
+      <View style={styles.colorPickerContainer}>
+        <Text style={styles.toolbarLabel}>Color</Text>
+        <View style={styles.colorPicker}>
+          {colorOptions.map((color) => (
+            <TouchableOpacity
+              key={color}
+              style={[
+                styles.colorButton,
+                { backgroundColor: color },
+                currentColor === color && styles.selectedColor,
+              ]}
+              onPress={() => handleColorChange(color)}
+            />
+          ))}
         </View>
       </View>
       
-      {/* Loading Overlay */}
-      {isExporting && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={themeColors.primary} />
-          <Text style={styles.loadingText}>Processing...</Text>
+      {/* Stroke Width Picker */}
+      <View style={styles.widthPickerContainer}>
+        <Text style={styles.toolbarLabel}>Stroke Width</Text>
+        <View style={styles.widthPicker}>
+          {strokeWidths.map((width) => (
+            <TouchableOpacity
+              key={width}
+              style={[
+                styles.widthButton,
+                currentWidth === width && styles.selectedWidth,
+              ]}
+              onPress={() => handleWidthChange(width)}
+            >
+              <View
+                style={[
+                  styles.widthIndicator,
+                  { height: width, backgroundColor: currentColor },
+                ]}
+              />
+            </TouchableOpacity>
+          ))}
         </View>
-      )}
+      </View>
     </View>
   );
 };
@@ -619,5 +730,35 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSizes.lg,
     fontWeight: typography.fontWeights.medium,
     marginBottom: spacing.sm,
+  },
+  clearButton: {
+    backgroundColor: themeColors.lightGray,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 4,
+    marginHorizontal: spacing.sm,
+  },
+  clearButtonText: {
+    color: themeColors.text,
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  disabledText: {
+    color: themeColors.textLight,
+  },
+  exportButton: {
+    backgroundColor: themeColors.primary,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 4,
+    marginHorizontal: spacing.sm,
+  },
+  exportButtonText: {
+    color: themeColors.white,
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
   },
 }); 
