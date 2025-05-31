@@ -1,206 +1,374 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  Animated,
+} from 'react-native';
 import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, typography } from '../../constants/theme';
+import theme from '../../constants/theme';
 
-interface VoiceRecorderProps {
-  onRecordingComplete: (uri: string) => void;
+// Voice recording result interface
+export interface VoiceRecordingResult {
+  status: 'completed' | 'cancelled' | 'error';
+  audioUri?: string;
+  durationMs?: number;
+  timestamp: number;
 }
 
-export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onRecordingComplete }) => {
+interface VoiceRecorderProps {
+  onRecordingComplete: (result: VoiceRecordingResult) => void;
+  maxDurationMs?: number;
+  showWaveform?: boolean;
+}
+
+export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
+  onRecordingComplete,
+  maxDurationMs = 30000, // Default 30 seconds
+  showWaveform = true,
+}) => {
+  // Permission and recorder state
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [recordingStatus, setRecordingStatus] = useState<'idle' | 'recording' | 'recorded' | 'playing'>('idle');
-  const [recordingDuration, setRecordingDuration] = useState(0);
-  const [recordingUri, setRecordingUri] = useState<string | null>(null);
+  const [recordingStatus, setRecordingStatus] = useState<'idle' | 'recording' | 'paused'>('idle');
+  const [audioUri, setAudioUri] = useState<string | null>(null);
+  const [recordingDuration, setRecordingDuration] = useState<number>(0);
   
-  // Request permissions
+  // Animation values for visualization
+  const soundLevel = useRef(new Animated.Value(0)).current;
+  const visualizerValues = useRef(Array(20).fill(0).map(() => new Animated.Value(1))).current;
+  
+  // Timer ref for recording duration
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Request audio permissions on component mount
   useEffect(() => {
     (async () => {
-      await Audio.requestPermissionsAsync();
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+        });
+        
+        const { status } = await Audio.requestPermissionsAsync();
+        setHasPermission(status === 'granted');
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error requesting audio permission:', error);
+        Alert.alert('Error', 'Could not request microphone permission');
+        setIsLoading(false);
+      }
     })();
     
+    // Cleanup function to stop any active recording
     return () => {
-      if (recording) {
-        stopRecording();
-      }
-      if (sound) {
-        sound.unloadAsync();
-      }
+      stopRecording();
     };
   }, []);
   
-  // Update duration timer
+  // Effect to handle max duration timer
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
     if (recordingStatus === 'recording') {
-      interval = setInterval(() => {
-        setRecordingDuration(prev => prev + 1);
-      }, 1000);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      
+      // Set timer to track duration
+      timerRef.current = setInterval(() => {
+        setRecordingDuration(prev => {
+          const newDuration = prev + 100;
+          
+          // If reached max duration, stop recording
+          if (newDuration >= maxDurationMs) {
+            stopRecording();
+            return maxDurationMs;
+          }
+          
+          return newDuration;
+        });
+      }, 100);
+      
+      // Animate visualizer
+      animateVisualizer();
+    } else {
+      // Clear timer when not recording
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     }
     
     return () => {
-      if (interval) {
-        clearInterval(interval);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
       }
     };
-  }, [recordingStatus]);
+  }, [recordingStatus, maxDurationMs]);
   
-  // Start recording
+  // Generate a random directory for storing recordings
+  const getRecordingFileUri = async () => {
+    const dirInfo = await FileSystem.getInfoAsync(FileSystem.documentDirectory + 'recordings/');
+    if (!dirInfo.exists) {
+      await FileSystem.makeDirectoryAsync(FileSystem.documentDirectory + 'recordings/');
+    }
+    
+    return FileSystem.documentDirectory + 'recordings/' + `recording-${Date.now()}.m4a`;
+  };
+  
+  // Start recording function
   const startRecording = async () => {
     try {
-      // Clear previous recording
-      if (recordingUri) {
-        setRecordingUri(null);
-      }
-      if (sound) {
-        await sound.unloadAsync();
-        setSound(null);
-      }
-      
-      // Reset duration
+      // Reset states
       setRecordingDuration(0);
+      setAudioUri(null);
       
-      // Start new recording
+      // Create and prepare recording
       const { recording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY
       );
       
       setRecording(recording);
       setRecordingStatus('recording');
-    } catch (error) {
-      console.error('Failed to start recording:', error);
-    }
-  };
-  
-  // Stop recording
-  const stopRecording = async () => {
-    if (!recording) return;
-    
-    try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
       
-      if (uri) {
-        setRecordingUri(uri);
-        onRecordingComplete(uri);
-      }
-      
-      setRecording(null);
-      setRecordingStatus('recorded');
-    } catch (error) {
-      console.error('Failed to stop recording:', error);
-    }
-  };
-  
-  // Play recording
-  const playRecording = async () => {
-    if (!recordingUri) return;
-    
-    try {
-      if (sound) {
-        await sound.unloadAsync();
-      }
-      
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: recordingUri },
-        { shouldPlay: true }
-      );
-      
-      setSound(newSound);
-      setRecordingStatus('playing');
-      
-      // When playback finishes
-      newSound.setOnPlaybackStatusUpdate(status => {
-        if (status.isLoaded && status.didJustFinish) {
-          setRecordingStatus('recorded');
+      // Monitor recording status
+      recording.setOnRecordingStatusUpdate(status => {
+        if (status.isRecording) {
+          const level = status.metering ? Math.max(-160, status.metering) + 160 : 0;
+          const normalizedLevel = Math.min(1, level / 40);
+          soundLevel.setValue(normalizedLevel);
         }
       });
     } catch (error) {
-      console.error('Failed to play recording:', error);
+      console.error('Failed to start recording', error);
+      Alert.alert('Error', 'Failed to start recording');
+      setRecordingStatus('idle');
     }
   };
   
-  // Stop playback
-  const stopPlayback = async () => {
-    if (!sound) return;
+  // Stop recording function
+  const stopRecording = async () => {
+    if (!recording) {
+      return;
+    }
     
     try {
-      await sound.stopAsync();
-      setRecordingStatus('recorded');
+      setRecordingStatus('idle');
+      
+      // Stop the recording
+      await recording.stopAndUnloadAsync();
+      
+      // Get the recorded URI
+      const uri = recording.getURI();
+      setAudioUri(uri);
+      
+      // Create a new filename and move the recording to our app's documents directory
+      if (uri) {
+        const destinationUri = await getRecordingFileUri();
+        await FileSystem.moveAsync({
+          from: uri,
+          to: destinationUri,
+        });
+        
+        // Pass the result to parent component
+        onRecordingComplete({
+          status: 'completed',
+          audioUri: destinationUri,
+          durationMs: recordingDuration,
+          timestamp: Date.now(),
+        });
+      }
+      
+      setRecording(null);
     } catch (error) {
-      console.error('Failed to stop playback:', error);
+      console.error('Failed to stop recording', error);
+      
+      // Handle error in stopping recording
+      onRecordingComplete({
+        status: 'error',
+        timestamp: Date.now(),
+      });
+      
+      setRecording(null);
+      setRecordingStatus('idle');
     }
   };
   
-  // Format seconds to MM:SS
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  // Cancel recording function
+  const cancelRecording = async () => {
+    if (!recording) {
+      return;
+    }
+    
+    try {
+      setRecordingStatus('idle');
+      await recording.stopAndUnloadAsync();
+      
+      // Notify parent of cancellation
+      onRecordingComplete({
+        status: 'cancelled',
+        timestamp: Date.now(),
+      });
+      
+      setRecording(null);
+    } catch (error) {
+      console.error('Failed to cancel recording', error);
+      setRecording(null);
+      setRecordingStatus('idle');
+    }
   };
+  
+  // Function to animate the visualizer
+  const animateVisualizer = () => {
+    visualizerValues.forEach((value, index) => {
+      const delay = index * 50;
+      
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(value, {
+            toValue: 1 + Math.random() * 1.5,
+            duration: 700 + Math.random() * 300,
+            useNativeDriver: true,
+            delay,
+          }),
+          Animated.timing(value, {
+            toValue: 1,
+            duration: 700 + Math.random() * 300,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    });
+  };
+  
+  // Format milliseconds to MM:SS format
+  const formatDuration = (ms: number): string => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+  
+  // If permission not yet determined
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={styles.infoText}>Initializing audio...</Text>
+      </View>
+    );
+  }
+  
+  // If audio permission denied
+  if (hasPermission === false) {
+    return (
+      <View style={styles.container}>
+        <Ionicons name="mic-off" size={64} color={theme.colors.textLight} />
+        <Text style={styles.errorText}>
+          Microphone permission is required for voice recording.
+        </Text>
+        <TouchableOpacity
+          style={styles.permissionButton}
+          onPress={async () => {
+            const { status } = await Audio.requestPermissionsAsync();
+            setHasPermission(status === 'granted');
+          }}
+        >
+          <Text style={styles.permissionButtonText}>
+            Grant Permission
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
   
   return (
     <View style={styles.container}>
+      {/* Recording status */}
       <View style={styles.statusContainer}>
-        {recordingStatus === 'idle' ? (
-          <Text style={styles.statusText}>Tap to record your voice note</Text>
-        ) : recordingStatus === 'recording' ? (
-          <View style={styles.recordingInfo}>
-            <View style={styles.recordingIndicator} />
-            <Text style={styles.recordingText}>Recording... {formatTime(recordingDuration)}</Text>
-          </View>
-        ) : (
-          <Text style={styles.statusText}>
-            Voice note recorded ({formatTime(recordingDuration)})
+        <Text style={styles.statusText}>
+          {recordingStatus === 'recording' 
+            ? 'Recording...' 
+            : 'Ready to record'}
+        </Text>
+        
+        {recordingStatus === 'recording' && (
+          <Text style={styles.durationText}>
+            {formatDuration(recordingDuration)} / {formatDuration(maxDurationMs)}
           </Text>
         )}
       </View>
       
+      {/* Sound level visualization */}
+      {showWaveform && (
+        <View style={styles.visualizerContainer}>
+          {recordingStatus === 'recording' ? (
+            <View style={styles.waveformContainer}>
+              {visualizerValues.map((value, index) => (
+                <Animated.View
+                  key={`bar-${index}`}
+                  style={[
+                    styles.waveformBar,
+                    {
+                      height: value.interpolate({
+                        inputRange: [0, 2.5],
+                        outputRange: [3, 40],
+                      }),
+                      opacity: soundLevel.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.3, 0.8],
+                      }),
+                    },
+                  ]}
+                />
+              ))}
+            </View>
+          ) : (
+            <View style={styles.waveformPlaceholder}>
+              <Ionicons name="mic" size={32} color={theme.colors.textLight} />
+              <Text style={styles.placeholderText}>
+                Tap the button below to start recording
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+      
+      {/* Recording controls */}
       <View style={styles.controlsContainer}>
-        {recordingStatus === 'idle' ? (
+        {recordingStatus === 'recording' ? (
+          <View style={styles.recordingControls}>
+            <TouchableOpacity
+              style={[styles.controlButton, styles.cancelButton]}
+              onPress={cancelRecording}
+            >
+              <Ionicons name="close-circle" size={32} color="#fff" />
+              <Text style={styles.buttonText}>Cancel</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.controlButton, styles.stopButton]}
+              onPress={stopRecording}
+            >
+              <Ionicons name="stop-circle" size={48} color="#fff" />
+              <Text style={styles.buttonText}>Stop</Text>
+            </TouchableOpacity>
+            
+            <View style={styles.placeholderButton} />
+          </View>
+        ) : (
           <TouchableOpacity
             style={styles.recordButton}
             onPress={startRecording}
           >
-            <Ionicons name="mic" size={32} color="#fff" />
-          </TouchableOpacity>
-        ) : recordingStatus === 'recording' ? (
-          <TouchableOpacity
-            style={styles.stopButton}
-            onPress={stopRecording}
-          >
-            <Ionicons name="stop" size={32} color="#fff" />
-          </TouchableOpacity>
-        ) : recordingStatus === 'recorded' ? (
-          <TouchableOpacity
-            style={styles.playButton}
-            onPress={playRecording}
-          >
-            <Ionicons name="play" size={32} color="#fff" />
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={styles.stopButton}
-            onPress={stopPlayback}
-          >
-            <Ionicons name="stop" size={32} color="#fff" />
-          </TouchableOpacity>
-        )}
-        
-        {recordingStatus !== 'idle' && recordingStatus !== 'recording' && (
-          <TouchableOpacity
-            style={styles.newRecordingButton}
-            onPress={startRecording}
-          >
-            <Ionicons name="refresh" size={24} color={colors.primary} />
-            <Text style={styles.newRecordingText}>New Recording</Text>
+            <Ionicons name="mic" size={40} color="#fff" />
           </TouchableOpacity>
         )}
       </View>
@@ -210,76 +378,121 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onRecordingComplet
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.background,
-    borderRadius: 8,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    flex: 1,
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.radii.md,
+    padding: theme.spacing.md,
+    justifyContent: 'space-between',
+  },
+  infoText: {
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.text,
+    textAlign: 'center',
+    marginTop: theme.spacing.md,
+  },
+  errorText: {
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.text,
+    textAlign: 'center',
+    marginVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  permissionButton: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radii.md,
+    marginTop: theme.spacing.md,
+  },
+  permissionButtonText: {
+    color: '#fff',
+    fontSize: theme.typography.fontSizes.md,
+    fontWeight: theme.typography.fontWeights.medium,
   },
   statusContainer: {
     alignItems: 'center',
-    marginBottom: spacing.md,
-    height: 40,
-    justifyContent: 'center',
+    marginBottom: theme.spacing.md,
   },
   statusText: {
-    fontSize: typography.fontSizes.md,
-    color: colors.text,
+    fontSize: theme.typography.fontSizes.lg,
+    fontWeight: theme.typography.fontWeights.medium,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
   },
-  recordingInfo: {
+  durationText: {
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.primary,
+    fontWeight: theme.typography.fontWeights.bold,
+  },
+  visualizerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: theme.spacing.lg,
+  },
+  waveformContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    height: 100,
+    width: '100%',
   },
-  recordingIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.error,
-    marginRight: spacing.sm,
+  waveformBar: {
+    width: 4,
+    marginHorizontal: 2,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 2,
   },
-  recordingText: {
-    fontSize: typography.fontSizes.md,
-    color: colors.error,
-    fontWeight: typography.fontWeights.medium,
+  waveformPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    marginTop: theme.spacing.md,
+    color: theme.colors.textLight,
+    fontSize: theme.typography.fontSizes.sm,
+    textAlign: 'center',
   },
   controlsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
+    marginTop: theme.spacing.lg,
   },
-  recordButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
+  recordingControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    width: '100%',
+  },
+  controlButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: theme.spacing.sm,
+  },
+  cancelButton: {
+    marginRight: theme.spacing.lg,
   },
   stopButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.error,
+    backgroundColor: theme.colors.error,
+    borderRadius: 40,
+    padding: theme.spacing.md,
+    ...theme.shadows.medium,
+  },
+  placeholderButton: {
+    width: 48,
+  },
+  recordButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    ...theme.shadows.medium,
   },
-  playButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+  buttonText: {
+    color: '#fff',
+    fontSize: theme.typography.fontSizes.sm,
+    marginTop: theme.spacing.xs,
   },
-  newRecordingButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: spacing.lg,
-    padding: spacing.sm,
-  },
-  newRecordingText: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.primary,
-    marginLeft: spacing.xs,
-  },
+}); 
 }); 
