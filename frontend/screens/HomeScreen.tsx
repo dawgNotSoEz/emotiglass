@@ -34,6 +34,13 @@ export const HomeScreen: React.FC = () => {
           onPress={() => navigation.navigate('MoodAnalysis')} 
           style={styles.button}
         />
+        <Button 
+          title="Ambient Mode" 
+          variant="outline"
+          color="secondary"
+          onPress={() => navigation.navigate('AmbientMode')} 
+          style={styles.button}
+        />
       </View>
     </View>
   );
