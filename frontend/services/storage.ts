@@ -133,13 +133,32 @@ export const getMoodEntry = async (id: string): Promise<MoodEntry | null> => {
     // Check if file exists
     const fileInfo = await FileSystem.getInfoAsync(entryPath);
     if (!fileInfo.exists) {
-      console.error(`Mood entry file does not exist: ${entryPath}`);
+      console.warn(`Mood entry file does not exist: ${entryPath}`);
+      // Clean up the index by removing the non-existent entry
+      const entryIds = await getEntryIndex();
+      if (entryIds.includes(id)) {
+        console.log(`Removing non-existent entry ${id} from index`);
+        const newEntryIds = entryIds.filter(entryId => entryId !== id);
+        await updateEntryIndex(newEntryIds);
+      }
       return null;
     }
     
-    const entryJson = await FileSystem.readAsStringAsync(entryPath);
-    
-    return JSON.parse(entryJson) as MoodEntry;
+    try {
+      const entryJson = await FileSystem.readAsStringAsync(entryPath);
+      return JSON.parse(entryJson) as MoodEntry;
+    } catch (readError) {
+      console.error(`Error reading mood entry file ${entryPath}:`, readError);
+      // File exists but cannot be read or is corrupted, clean up
+      await FileSystem.deleteAsync(entryPath, { idempotent: true });
+      // Remove from index
+      const entryIds = await getEntryIndex();
+      if (entryIds.includes(id)) {
+        const newEntryIds = entryIds.filter(entryId => entryId !== id);
+        await updateEntryIndex(newEntryIds);
+      }
+      return null;
+    }
   } catch (error) {
     console.error(`Failed to get mood entry ${id}:`, error);
     return null;
@@ -157,12 +176,21 @@ export const getAllMoodEntries = async (): Promise<MoodEntry[]> => {
     
     // Load each entry
     const entries: MoodEntry[] = [];
+    const validEntryIds: string[] = [];
     
     for (const id of entryIds) {
       const entry = await getMoodEntry(id);
       if (entry) {
         entries.push(entry);
+        validEntryIds.push(id);
       }
+    }
+    
+    // If we found fewer valid entries than were in the index,
+    // update the index to contain only valid entries
+    if (validEntryIds.length < entryIds.length) {
+      console.log(`Updating entry index: ${entryIds.length} -> ${validEntryIds.length} entries`);
+      await updateEntryIndex(validEntryIds);
     }
     
     return entries;
