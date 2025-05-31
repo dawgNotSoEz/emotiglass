@@ -118,10 +118,12 @@ export const EmotionInputScreen: React.FC = () => {
       const emotionResults = await analyzeDrawing(drawingData);
       console.log('Drawing analysis complete', emotionResults);
       
-      // Update the emotion data
+      // Update the emotion data and store drawing data for thumbnails
       setEmotionData(prev => ({
         ...prev,
-        ...emotionResults
+        ...emotionResults,
+        // Store drawing data for thumbnail generation
+        drawingData: drawingData
       }));
     } catch (error) {
       console.error('Failed to process drawing:', error);
