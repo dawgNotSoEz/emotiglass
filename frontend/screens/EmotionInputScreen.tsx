@@ -84,13 +84,25 @@ export const EmotionInputScreen: React.FC = () => {
   // Update emotion data from drawing
   const handleDrawingComplete = async (drawingData: string) => {
     // Skip if empty drawing
-    if (drawingData === '[]') {
+    if (!drawingData || drawingData === '[]') {
       console.log('Empty drawing, skipping analysis');
       return;
     }
     
     try {
       console.log('Processing drawing data...');
+      
+      // Validate drawing data
+      try {
+        const parsedData = JSON.parse(drawingData);
+        if (!Array.isArray(parsedData) || parsedData.length === 0) {
+          console.log('Invalid or empty drawing data, skipping analysis');
+          return;
+        }
+      } catch (parseError) {
+        console.error('Invalid drawing data format:', parseError);
+        return;
+      }
       
       // Save the drawing
       const uri = await saveDrawing(drawingData);
@@ -317,7 +329,10 @@ export const EmotionInputScreen: React.FC = () => {
         {activeTab === 'drawing' && (
           <View style={styles.drawingContainer}>
             {/* Ensure the drawing canvas takes up available space */}
-            <DrawingCanvas onDrawingComplete={handleDrawingComplete} />
+            <DrawingCanvas 
+              onDrawingComplete={handleDrawingComplete}
+              height={400} // Explicit height for better drawing experience
+            />
           </View>
         )}
         
@@ -454,6 +469,8 @@ const styles = StyleSheet.create({
   drawingContainer: {
     flex: 1, // Allow drawing container to take up available space
     marginVertical: theme.spacing.md,
+    minHeight: 400, // Ensure minimum height for drawing area
+    width: '100%', // Take full width
   },
   voiceContainer: {
     marginVertical: theme.spacing.md,
