@@ -6,6 +6,8 @@ import { EmotionInputScreen } from '../screens/EmotionInputScreen';
 import { MoodVisualizationScreen } from '../screens/MoodVisualizationScreen';
 import { MoodDiaryScreen } from '../screens/MoodDiaryScreen';
 import { MoodAnalysisScreen } from '../screens/MoodAnalysisScreen';
+import { EntryDetailsScreen } from '../screens/EntryDetailsScreen';
+import { AmbientModeScreen } from '../screens/AmbientModeScreen';
 import { EmotionData } from '../types';
 
 export type RootStackParamList = {
@@ -14,6 +16,8 @@ export type RootStackParamList = {
   MoodVisualization: { emotionData: EmotionData };
   MoodDiary: undefined;
   MoodAnalysis: undefined;
+  EntryDetails: { entryId: string };
+  AmbientMode: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -32,6 +36,8 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="MoodVisualization" component={MoodVisualizationScreen} />
         <Stack.Screen name="MoodDiary" component={MoodDiaryScreen} />
         <Stack.Screen name="MoodAnalysis" component={MoodAnalysisScreen} />
+        <Stack.Screen name="EntryDetails" component={EntryDetailsScreen} />
+        <Stack.Screen name="AmbientMode" component={AmbientModeScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
