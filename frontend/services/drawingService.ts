@@ -81,21 +81,31 @@ export const saveDrawing = async (drawingData: string): Promise<string | null> =
 };
 
 /**
- * Load drawing from file system
- * @param uri URI of drawing to load
- * @returns Drawing paths array
+ * Load a drawing from storage
+ * @param uri URI of the drawing file
+ * @returns Drawing paths or null if not found
  */
 export const loadDrawing = async (uri: string): Promise<Path[] | null> => {
   try {
-    const drawingData = await safeReadFromFile(uri);
-    
-    if (!drawingData) {
+    // Check if file exists
+    const fileInfo = await FileSystem.getInfoAsync(uri);
+    if (!fileInfo.exists) {
+      console.warn(`[drawingService] Drawing file does not exist: ${uri}`);
       return null;
     }
     
-    return JSON.parse(drawingData) as Path[];
+    try {
+      // Read file content
+      const content = await FileSystem.readAsStringAsync(uri);
+      return JSON.parse(content);
+    } catch (readError) {
+      console.error(`[drawingService] Error reading drawing file ${uri}:`, readError);
+      // Delete corrupted file
+      await FileSystem.deleteAsync(uri, { idempotent: true });
+      return null;
+    }
   } catch (error) {
-    console.error('[drawingService] Failed to load drawing:', error);
+    console.error(`[drawingService] Failed to load drawing from ${uri}:`, error);
     return null;
   }
 };
