@@ -14,6 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import theme from '../constants/theme';
 import { getAllMoodEntries, deleteMoodEntry } from '../services/storage';
 import { MoodEntry, RootStackParamList } from '../types';
+import { DrawingThumbnail } from '../components/ui/DrawingThumbnail';
+import { Card } from '../components/ui/Card';
 
 type MoodDiaryScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MoodDiary'>;
 
@@ -64,16 +66,39 @@ export const MoodDiaryScreen: React.FC = () => {
     const emotionColor = getEmotionColor(item.dominantEmotion);
     
     return (
-      <View style={styles.entryCard}>
+      <Card style={styles.entryCard} elevation="medium" padding="none" borderRadius="medium">
         <View style={[styles.emotionIndicator, { backgroundColor: emotionColor }]} />
         <View style={styles.entryContent}>
           <Text style={styles.emotionText}>{item.dominantEmotion.toUpperCase()}</Text>
           <Text style={styles.dateText}>{formattedDate}</Text>
           
-          <View style={styles.entryStats}>
-            <Text style={styles.statText}>Energy: {Math.round(item.emotions.energy)}%</Text>
-            <Text style={styles.statText}>Calmness: {Math.round(item.emotions.calmness)}%</Text>
-            <Text style={styles.statText}>Tension: {Math.round(item.emotions.tension)}%</Text>
+          <View style={styles.entryDetails}>
+            <View style={styles.entryStats}>
+              <Text style={styles.statText}>Energy: {Math.round(item.emotions.energy)}%</Text>
+              <Text style={styles.statText}>Calmness: {Math.round(item.emotions.calmness)}%</Text>
+              <Text style={styles.statText}>Tension: {Math.round(item.emotions.tension)}%</Text>
+            </View>
+            
+            {/* Show drawing thumbnail if drawing data is available */}
+            {item.source === 'drawing' && item.drawingData && (
+              <View style={styles.drawingContainer}>
+                <DrawingThumbnail 
+                  drawingData={item.drawingData} 
+                  width={80} 
+                  height={80} 
+                />
+              </View>
+            )}
+          </View>
+          
+          {/* Source indicator */}
+          <View style={styles.sourceContainer}>
+            <Ionicons 
+              name={getSourceIcon(item.source)} 
+              size={16} 
+              color={theme.colors.textLight} 
+            />
+            <Text style={styles.sourceText}>{item.source}</Text>
           </View>
         </View>
         
@@ -83,7 +108,7 @@ export const MoodDiaryScreen: React.FC = () => {
         >
           <Ionicons name="trash-outline" size={20} color={theme.colors.error} />
         </TouchableOpacity>
-      </View>
+      </Card>
     );
   };
 
@@ -131,17 +156,29 @@ export const MoodDiaryScreen: React.FC = () => {
 // Helper function to get a color for each emotion
 const getEmotionColor = (emotion: string): string => {
   const emotionColors: Record<string, string> = {
-    joy: '#FFD700',
-    sadness: '#4169E1',
-    anger: '#B22222',
-    fear: '#556B2F',
-    surprise: '#9932CC',
-    disgust: '#228B22',
-    contentment: '#4682B4',
-    neutral: '#A9A9A9',
+    joy: theme.colors.joy,
+    sadness: theme.colors.sadness,
+    anger: theme.colors.anger,
+    fear: theme.colors.fear,
+    surprise: theme.colors.surprise,
+    disgust: theme.colors.disgust,
+    contentment: theme.colors.contentment,
+    neutral: theme.colors.neutral,
   };
   
   return emotionColors[emotion] || theme.colors.primary;
+};
+
+// Helper function to get icon for entry source
+const getSourceIcon = (source: string): string => {
+  const sourceIcons: Record<string, string> = {
+    sliders: 'options',
+    drawing: 'brush',
+    voice: 'mic',
+    face: 'camera',
+  };
+  
+  return sourceIcons[source] || 'help-circle';
 };
 
 const styles = StyleSheet.create({
@@ -161,7 +198,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: theme.typography.fontSizes.lg,
-    fontWeight: '700',
+    fontWeight: theme.typography.fontWeights.bold,
     color: theme.colors.text,
   },
   loadingContainer: {
@@ -174,14 +211,7 @@ const styles = StyleSheet.create({
   },
   entryCard: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 8,
     marginBottom: theme.spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
     overflow: 'hidden',
   },
   emotionIndicator: {
@@ -203,15 +233,32 @@ const styles = StyleSheet.create({
     color: theme.colors.textLight,
     marginBottom: theme.spacing.sm,
   },
-  entryStats: {
+  entryDetails: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing.sm,
+  },
+  entryStats: {
+    flex: 1,
   },
   statText: {
     fontSize: theme.typography.fontSizes.sm,
     color: theme.colors.text,
-    marginRight: theme.spacing.md,
     marginBottom: theme.spacing.xs,
+  },
+  drawingContainer: {
+    marginLeft: theme.spacing.sm,
+  },
+  sourceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: theme.spacing.xs,
+  },
+  sourceText: {
+    fontSize: theme.typography.fontSizes.xs,
+    color: theme.colors.textLight,
+    marginLeft: theme.spacing.xs,
+    textTransform: 'capitalize',
   },
   deleteButton: {
     padding: theme.spacing.md,
@@ -234,10 +281,11 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary,
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
-    borderRadius: 8,
+    borderRadius: theme.radii.md,
+    ...theme.shadows.medium,
   },
   createButtonText: {
-    color: '#fff',
+    color: theme.colors.white,
     fontSize: theme.typography.fontSizes.md,
     fontWeight: theme.typography.fontWeights.medium,
   },
