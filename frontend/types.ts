@@ -36,6 +36,13 @@ export interface MoodEntry {
   confidence: number;
   notes?: string;
   source: 'sliders' | 'drawing' | 'voice' | 'face';
+  drawingData?: string; // JSON string of drawing paths for thumbnails
+  
+  // Personalization features
+  tags?: string[]; // User-defined tags like "Morning", "Work", "Exercise", etc.
+  emojiSummary?: string; // Emoji representing the mood
+  title?: string; // User-defined title for the entry
+  isFavorite?: boolean; // Whether entry is marked as favorite
 }
 
 // Navigation types
@@ -48,6 +55,10 @@ export type RootStackParamList = {
   MoodVisualization: {
     emotionData: EmotionData;
   };
+  EntryDetails: {
+    entryId: string;
+  };
+  AmbientMode: undefined;
 };
 
 // Theme types

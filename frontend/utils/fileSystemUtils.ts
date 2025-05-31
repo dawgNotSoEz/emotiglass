@@ -3,10 +3,41 @@ import * as MediaLibrary from 'expo-media-library';
 import { Platform, Alert } from 'react-native';
 
 // Define constants for directory paths
-export const APP_DIRECTORY = FileSystem.documentDirectory || '';
+export const APP_DIRECTORY = Platform.OS === 'web' 
+  ? '/tmp/emotiglass/' 
+  : (FileSystem.documentDirectory || '');
+
 export const DRAWINGS_DIR = `${APP_DIRECTORY}drawings/`;
 export const MOOD_ENTRIES_DIR = `${APP_DIRECTORY}mood_entries/`;
 export const VOICE_RECORDINGS_DIR = `${APP_DIRECTORY}voice_recordings/`;
+
+// Web-specific file system mock
+const WebFileSystemMock = {
+  documentDirectory: '/tmp/emotiglass/',
+  getInfoAsync: async (path: string) => ({
+    exists: true,
+    isDirectory: true,
+    uri: path,
+    size: 0,
+    modificationTime: Date.now()
+  }),
+  makeDirectoryAsync: async (path: string) => {
+    console.log(`[Web Mock] Creating directory: ${path}`);
+    return true;
+  },
+  writeAsStringAsync: async (path: string, content: string) => {
+    console.log(`[Web Mock] Writing to file: ${path}`);
+    return true;
+  },
+  readAsStringAsync: async (path: string) => {
+    console.log(`[Web Mock] Reading from file: ${path}`);
+    return '';
+  },
+  deleteAsync: async (path: string) => {
+    console.log(`[Web Mock] Deleting file: ${path}`);
+    return true;
+  }
+};
 
 /**
  * Request necessary permissions for file system operations
@@ -14,7 +45,16 @@ export const VOICE_RECORDINGS_DIR = `${APP_DIRECTORY}voice_recordings/`;
  */
 export const requestFileSystemPermissions = async (): Promise<{
   mediaLibrary: boolean;
+  fileSystem: boolean;
 }> => {
+  if (Platform.OS === 'web') {
+    console.warn('Limited file system access on web platform');
+    return {
+      mediaLibrary: false,
+      fileSystem: false
+    };
+  }
+
   try {
     // Media library permissions (needed for saving to camera roll)
     const mediaPermission = await MediaLibrary.requestPermissionsAsync();
@@ -28,12 +68,14 @@ export const requestFileSystemPermissions = async (): Promise<{
     }
     
     return {
-      mediaLibrary: mediaGranted
+      mediaLibrary: mediaGranted,
+      fileSystem: true
     };
   } catch (error) {
     console.error('Error requesting file system permissions:', error);
     return {
-      mediaLibrary: false
+      mediaLibrary: false,
+      fileSystem: false
     };
   }
 };
@@ -114,34 +156,26 @@ export const createDirectoryIfNeeded = async (dirPath: string): Promise<boolean>
  * Initialize all required directories for the app
  */
 export const initializeAppDirectories = async (): Promise<boolean> => {
+  const fileSystemToUse = Platform.OS === 'web' ? WebFileSystemMock : FileSystem;
+
   try {
-    // Create all required directories
     const directories = [
       DRAWINGS_DIR,
       MOOD_ENTRIES_DIR,
       VOICE_RECORDINGS_DIR
     ];
-    
-    // Force creation of parent directory first
-    await createDirectoryIfNeeded(APP_DIRECTORY);
-    
-    // Create each directory
-    const results = await Promise.all(
-      directories.map(dir => createDirectoryIfNeeded(dir))
-    );
-    
-    // Check if all directories were created successfully
-    const allCreated = results.every(result => result === true);
-    
-    if (!allCreated) {
-      console.error('Failed to create one or more directories');
-    } else {
-      console.log('All directories created successfully');
+
+    for (const dir of directories) {
+      const dirInfo = await fileSystemToUse.getInfoAsync(dir);
+
+      if (!dirInfo.exists) {
+        await fileSystemToUse.makeDirectoryAsync(dir, { intermediates: true });
+      }
     }
-    
-    return allCreated;
+
+    return true;
   } catch (error) {
-    console.error('Error initializing app directories:', error);
+    console.error('Error initializing directories:', error);
     return false;
   }
 };

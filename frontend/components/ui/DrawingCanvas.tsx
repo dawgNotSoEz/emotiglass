@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import Svg, { Path, G } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
-import { colors as themeColors, spacing, typography } from '../../constants/theme';
+import theme from '../../constants/theme';
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import ViewShot from 'react-native-view-shot';
@@ -194,11 +194,11 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       
       // Create a new path with current settings
       const skiaPath = createSkiaPath(currentPoints);
-      const newPath: DrawingPath = {
+        const newPath: DrawingPath = {
         id: Date.now().toString(),
         points: currentPoints,
-        color: currentColor,
-        width: currentWidth,
+          color: currentColor,
+          width: currentWidth,
         skiaPath,
       };
       
@@ -233,7 +233,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   
   // Clear the canvas
   const handleClear = useCallback(() => {
-    setPaths([]);
+            setPaths([]);
     setCurrentPoints([]);
     if (onDrawingComplete) onDrawingComplete(JSON.stringify([]));
   }, [onDrawingComplete]);
@@ -322,20 +322,99 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     }
   };
   
-  // Render current path as SkiaPath
+  // Render current path as SkiaPath with preview effect
   const renderCurrentSkiaPath = () => {
     if (currentPoints.length === 0) return null;
+    
     const skiaPath = createSkiaPath(currentPoints);
+    
+    // Return both the main path and the preview effect
     return (
-      <SkiaPath
-        path={skiaPath}
-        color={currentColor}
-        strokeWidth={currentWidth}
-        style="stroke"
-        strokeCap="round"
-        strokeJoin="round"
-      />
+      <>
+        {/* Main stroke */}
+        <SkiaPath
+          path={skiaPath}
+          color={currentColor}
+          strokeWidth={currentWidth}
+          style="stroke"
+          strokeCap="round"
+          strokeJoin="round"
+        />
+        
+        {/* Glow effect for better visual feedback */}
+        <SkiaPath
+          path={skiaPath}
+          color={currentColor}
+          style="stroke"
+          strokeWidth={currentWidth + 4}
+          strokeCap="round"
+          strokeJoin="round"
+          opacity={0.2}
+        />
+        
+        {/* Brush position indicator */}
+        {isDrawing && currentPoints.length > 0 && (() => {
+          const lastPoint = currentPoints[currentPoints.length - 1];
+          const path = Skia.Path.Make();
+          path.addCircle(lastPoint.x, lastPoint.y, currentWidth + 2);
+          
+          return (
+            <SkiaPath
+              path={path}
+              color={currentColor}
+              style="stroke"
+              strokeWidth={2}
+            />
+          );
+        })()}
+      </>
     );
+  };
+  
+  // Add a function to render grid lines
+  const renderGridLines = () => {
+    const gridSize = 20;
+    const canvasWidth = typeof width === 'number' ? width : Dimensions.get('window').width - 32;
+    const canvasHeight = typeof height === 'number' ? height : 300;
+    
+    const horizontalLines = [];
+    const verticalLines = [];
+    
+    // Create horizontal grid lines
+    for (let y = gridSize; y < canvasHeight; y += gridSize) {
+      const path = Skia.Path.Make();
+      path.moveTo(0, y);
+      path.lineTo(canvasWidth, y);
+      
+      horizontalLines.push(
+        <SkiaPath
+          key={`h-${y}`}
+          path={path}
+          color="rgba(0, 0, 0, 0.05)"
+          style="stroke"
+          strokeWidth={1}
+        />
+      );
+    }
+    
+    // Create vertical grid lines
+    for (let x = gridSize; x < canvasWidth; x += gridSize) {
+      const path = Skia.Path.Make();
+      path.moveTo(x, 0);
+      path.lineTo(x, canvasHeight);
+      
+      verticalLines.push(
+        <SkiaPath
+          key={`v-${x}`}
+          path={path}
+          color="rgba(0, 0, 0, 0.05)"
+          style="stroke"
+          strokeWidth={1}
+        />
+      );
+    }
+    
+    return [...horizontalLines, ...verticalLines];
   };
   
   return (
@@ -364,6 +443,9 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
               isDrawing && styles.activeCanvas // Add highlighted border when drawing
             ]}
           >
+            {/* Grid lines for better spatial reference */}
+            {renderGridLines()}
+            
             {/* Render completed paths */}
             {paths.map((path) => (
               <SkiaPath
@@ -377,7 +459,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
               />
             ))}
             
-            {/* Render current path */}
+            {/* Render current path with effects */}
             {renderCurrentSkiaPath()}
           </Canvas>
         </GestureDetector>
@@ -403,7 +485,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
             <Ionicons
               name="arrow-undo"
               size={24}
-              color={paths.length === 0 ? themeColors.textLight : themeColors.primary}
+              color={paths.length === 0 ? theme.colors.textLight : theme.colors.primary}
             />
           </TouchableOpacity>
           
@@ -415,7 +497,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
             <Ionicons
               name="trash-outline"
               size={24}
-              color={paths.length === 0 ? themeColors.textLight : themeColors.primary}
+              color={paths.length === 0 ? theme.colors.textLight : theme.colors.primary}
             />
           </TouchableOpacity>
           
@@ -423,18 +505,56 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
             style={styles.toolButton}
             onPress={saveToMediaLibrary}
             disabled={paths.length === 0 || isExporting}
-            >
+          >
             <Ionicons
               name="save-outline"
               size={24}
-              color={paths.length === 0 ? themeColors.textLight : themeColors.primary}
+              color={paths.length === 0 ? theme.colors.textLight : theme.colors.primary}
             />
             </TouchableOpacity>
           </View>
         
-        {/* Color Picker */}
+        {/* Add Clear Button */}
+        <TouchableOpacity
+          style={[styles.clearButton, paths.length === 0 && styles.disabledButton]}
+          onPress={handleClear}
+          disabled={paths.length === 0}
+        >
+          <Text style={[styles.clearButtonText, paths.length === 0 && styles.disabledText]}>
+            Clear Drawing
+          </Text>
+        </TouchableOpacity>
+        
+        {/* Export Button */}
+        <TouchableOpacity
+          style={[styles.exportButton, paths.length === 0 && styles.disabledButton]}
+          onPress={async () => {
+            setIsExporting(true);
+            try {
+              const base64 = await exportAsBase64();
+              if (base64 && onDrawingComplete) {
+                onDrawingComplete(JSON.stringify(paths));
+              }
+            } catch (error) {
+              console.error('Failed to export drawing:', error);
+              if (onError) onError(error as Error);
+            } finally {
+              setIsExporting(false);
+            }
+          }}
+          disabled={paths.length === 0 || isExporting}
+        >
+          {isExporting ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.exportButtonText}>Done</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+      
+      {/* Color Picker */}
           <View style={styles.colorPickerContainer}>
-          <Text style={styles.toolbarLabel}>Color</Text>
+        <Text style={styles.toolbarLabel}>Color</Text>
             <View style={styles.colorPicker}>
               {colorOptions.map((color) => (
                 <TouchableOpacity
@@ -450,9 +570,9 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
             </View>
           </View>
           
-        {/* Stroke Width Picker */}
+      {/* Stroke Width Picker */}
           <View style={styles.widthPickerContainer}>
-          <Text style={styles.toolbarLabel}>Stroke Width</Text>
+        <Text style={styles.toolbarLabel}>Stroke Width</Text>
             <View style={styles.widthPicker}>
               {strokeWidths.map((width) => (
                 <TouchableOpacity
@@ -471,17 +591,8 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
                   />
                 </TouchableOpacity>
               ))}
-          </View>
+            </View>
         </View>
-      </View>
-      
-      {/* Loading Overlay */}
-      {isExporting && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={themeColors.primary} />
-          <Text style={styles.loadingText}>Processing...</Text>
-        </View>
-      )}
     </View>
   );
 };
@@ -513,22 +624,22 @@ const styles = StyleSheet.create({
   },
   activeCanvas: {
     borderWidth: 2,
-    borderColor: themeColors.primary,
+    borderColor: theme.colors.primary,
     borderStyle: 'dashed',
   },
   toolbar: {
-    padding: spacing.sm,
+    padding: theme.spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: themeColors.border,
+    borderTopColor: theme.colors.border,
     width: '100%', // Ensure toolbar takes full width
   },
   toolSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-    paddingBottom: spacing.sm,
+    marginBottom: theme.spacing.sm,
+    paddingBottom: theme.spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: themeColors.border,
+    borderBottomColor: theme.colors.border,
   },
   toolButton: {
     width: 40,
@@ -538,19 +649,19 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   colorPickerContainer: {
-    marginBottom: spacing.sm,
+    marginBottom: theme.spacing.sm,
   },
   colorPicker: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: spacing.xs,
+    marginTop: theme.spacing.xs,
   },
   colorButton: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    marginRight: spacing.sm,
-    marginBottom: spacing.xs,
+    marginRight: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
     borderWidth: 1,
     borderColor: '#ddd',
     elevation: 2,
@@ -561,25 +672,25 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.2 }],
   },
   widthPickerContainer: {
-    marginTop: spacing.sm,
+    marginTop: theme.spacing.sm,
   },
   widthPicker: {
     flexDirection: 'row',
-    marginTop: spacing.xs,
+    marginTop: theme.spacing.xs,
   },
   widthButton: {
     width: 40,
     height: 30,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.sm,
+    marginRight: theme.spacing.sm,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 4,
     elevation: 2,
   },
   selectedWidth: {
-    borderColor: themeColors.primary,
+    borderColor: theme.colors.primary,
     borderWidth: 2,
     backgroundColor: 'rgba(74, 144, 226, 0.1)',
   },
@@ -588,9 +699,9 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   toolbarLabel: {
-    fontSize: typography.fontSizes.sm,
-    color: themeColors.textLight,
-    fontWeight: typography.fontWeights.medium,
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textLight,
+    fontWeight: '500' as const,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -599,10 +710,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: spacing.sm,
-    color: themeColors.primary,
-    fontSize: typography.fontSizes.md,
-    fontWeight: typography.fontWeights.medium,
+    marginTop: theme.spacing.sm,
+    color: theme.colors.primary,
+    fontSize: theme.typography.fontSizes.md,
+    fontWeight: '500' as const,
   },
   emptyCanvasOverlay: {
     position: 'absolute',
@@ -616,8 +727,38 @@ const styles = StyleSheet.create({
   },
   emptyCanvasText: {
     color: 'rgba(0, 0, 0, 0.2)',
-    fontSize: typography.fontSizes.lg,
-    fontWeight: typography.fontWeights.medium,
-    marginBottom: spacing.sm,
+    fontSize: theme.typography.fontSizes.lg,
+    fontWeight: '500' as const,
+    marginBottom: theme.spacing.sm,
+  },
+  clearButton: {
+    backgroundColor: theme.colors.lightGray,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: 4,
+    marginHorizontal: theme.spacing.sm,
+  },
+  clearButtonText: {
+    color: theme.colors.text,
+    fontSize: theme.typography.fontSizes.sm,
+    fontWeight: '500' as const,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  disabledText: {
+    color: theme.colors.textLight,
+  },
+  exportButton: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: 4,
+    marginHorizontal: theme.spacing.sm,
+  },
+  exportButtonText: {
+    color: theme.colors.text,
+    fontSize: theme.typography.fontSizes.sm,
+    fontWeight: '500' as const,
   },
 }); 

@@ -1,280 +1,637 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { 
+  View, 
+  StyleSheet, 
+  Text, 
+  TouchableOpacity, 
+  ScrollView, 
+  Dimensions 
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { 
+  useSharedValue, 
+  useAnimatedStyle, 
+  withTiming, 
+  withRepeat, 
+  withSequence,
+  interpolateColor,
+  Easing,
+  withDelay
+} from 'react-native-reanimated';
+import { EmotionData, RootStackParamList } from '../types';
 import theme from '../constants/theme';
-import { RootStackParamList } from '../types';
-import { analyzeEmotions } from '../services/emotionAnalysis';
-import { saveMoodEntry, MoodEntry } from '../services/storage';
-import { EmotionData, EmotionAnalysisResult } from '../types';
-import { EmotionAnimatedBackground } from '../components/visualizations/EmotionAnimatedBackground';
+import { Card } from '../components/ui/Card';
 
-type MoodVisualizationScreenNavigationProp = StackNavigationProp<
-  RootStackParamList,
-  'MoodVisualization'
->;
+type MoodVisualizationRouteProp = RouteProp<RootStackParamList, 'MoodVisualization'>;
+type MoodVisualizationScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MoodVisualization'>;
 
-type MoodVisualizationScreenRouteProp = RouteProp<
-  RootStackParamList,
-  'MoodVisualization'
->;
+const { width: screenWidth } = Dimensions.get('window');
 
 export const MoodVisualizationScreen: React.FC = () => {
   const navigation = useNavigation<MoodVisualizationScreenNavigationProp>();
-  const route = useRoute<MoodVisualizationScreenRouteProp>();
+  const route = useRoute<MoodVisualizationRouteProp>();
   const { emotionData } = route.params;
   
-  const [moodAnalysis, setMoodAnalysis] = useState<EmotionAnalysisResult | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveComplete, setSaveComplete] = useState(false);
+  const [dominantEmotion, setDominantEmotion] = useState<string>('neutral');
+  const [intensity, setIntensity] = useState<number>(0);
+  const [animationComplete, setAnimationComplete] = useState<boolean>(false);
   
+  // Animation values
+  const rotation = useSharedValue(0);
+  const scale = useSharedValue(0);
+  const opacity = useSharedValue(0);
+  const backgroundColorValue = useSharedValue(0);
+  const translateY = useSharedValue(50);
+  
+  // Get dominant emotion
   useEffect(() => {
-    // Analyze the emotion data
-    const analyzeData = async () => {
-      const analysis = await analyzeEmotions(emotionData);
-      setMoodAnalysis(analysis);
-    };
+    const emotions = { ...emotionData };
+    delete emotions.energy;
+    delete emotions.calmness;
+    delete emotions.tension;
     
-    analyzeData();
+    // Find the dominant emotion
+    let maxEmotion = 'neutral';
+    let maxValue = 0;
+    
+    Object.entries(emotions).forEach(([emotion, value]) => {
+      if (value > maxValue) {
+        maxValue = value as number;
+        maxEmotion = emotion;
+      }
+    });
+    
+    setDominantEmotion(maxEmotion);
+    setIntensity(maxValue);
+    
+    // Start animations
+    startAnimations(maxEmotion, maxValue);
   }, [emotionData]);
   
-  const handleSave = async () => {
-    if (!moodAnalysis) return;
+  // Start different animations based on the dominant emotion
+  const startAnimations = (emotion: string, intensity: number) => {
+    // Base animation duration
+    const duration = 1000;
     
-    setIsSaving(true);
-    try {
-      // Create a mood entry
-      const moodEntry: MoodEntry = {
-        id: Date.now().toString(),
-        timestamp: Date.now(),
-        createdAt: Date.now(),
-        date: new Date().toISOString().split('T')[0],
-        emotions: emotionData,
-        dominantEmotion: moodAnalysis.dominantEmotion,
-        confidence: moodAnalysis.confidence,
-        notes: '',
-        source: 'sliders'
-      };
-      
-      await saveMoodEntry(moodEntry);
-      setSaveComplete(true);
-      
-      // Reset state after a short delay
-      setTimeout(() => {
-        setSaveComplete(false);
-      }, 2000);
-    } catch (error) {
-      console.error('Failed to save mood entry:', error);
-    } finally {
-      setIsSaving(false);
+    // Common animations
+    opacity.value = withTiming(1, { duration });
+    translateY.value = withTiming(0, { duration });
+    scale.value = withSequence(
+      withTiming(1.2, { duration: duration * 0.6 }),
+      withTiming(1, { duration: duration * 0.4 })
+    );
+    
+    // Emotion-specific animations
+    switch (emotion) {
+      case 'joy':
+        // Joyful rotation and bouncy movement
+        rotation.value = withRepeat(
+          withTiming(0.05, { duration: 500 }),
+          -1,
+          true
+        );
+        backgroundColorValue.value = withTiming(1, { duration });
+        break;
+        
+      case 'sadness':
+        // Slow, gentle movement
+        rotation.value = withSequence(
+          withTiming(-0.02, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+          withTiming(0.02, { duration: 1500, easing: Easing.inOut(Easing.ease) })
+        );
+        backgroundColorValue.value = withTiming(2, { duration: duration * 1.5 });
+        break;
+        
+      case 'anger':
+        // Sharp, intense movements
+        rotation.value = withRepeat(
+          withSequence(
+            withTiming(-0.05, { duration: 150, easing: Easing.bounce }),
+            withTiming(0.05, { duration: 150, easing: Easing.bounce })
+          ),
+          4,
+          false
+        );
+        backgroundColorValue.value = withTiming(3, { duration });
+        break;
+        
+      case 'fear':
+        // Trembling effect
+        rotation.value = withRepeat(
+          withSequence(
+            withTiming(-0.03, { duration: 100 }),
+            withTiming(0.03, { duration: 100 })
+          ),
+          6,
+          true
+        );
+        backgroundColorValue.value = withTiming(4, { duration });
+        break;
+        
+      case 'surprise':
+        // Quick pop and subtle bounce
+        scale.value = withSequence(
+          withTiming(1.5, { duration: 300, easing: Easing.elastic(3) }),
+          withTiming(1, { duration: 500 })
+        );
+        backgroundColorValue.value = withTiming(5, { duration });
+        break;
+        
+      case 'contentment':
+        // Gentle pulsing
+        scale.value = withRepeat(
+          withSequence(
+            withTiming(1.05, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
+            withTiming(1, { duration: 1000, easing: Easing.inOut(Easing.ease) })
+          ),
+          -1,
+          true
+        );
+        backgroundColorValue.value = withTiming(6, { duration });
+        break;
+        
+      case 'neutral':
+      default:
+        // Minimal animation
+        rotation.value = 0;
+        backgroundColorValue.value = withTiming(7, { duration });
+        break;
+    }
+    
+    // Mark animations as complete after a delay
+    setTimeout(() => {
+      setAnimationComplete(true);
+    }, 2000);
+  };
+  
+  // Animated styles
+  const animatedContainerStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { rotate: `${rotation.value}rad` },
+        { scale: scale.value }
+      ],
+      opacity: opacity.value,
+    };
+  });
+  
+  const animatedBackgroundStyle = useAnimatedStyle(() => {
+    const backgroundColor = interpolateColor(
+      backgroundColorValue.value,
+      [0, 1, 2, 3, 4, 5, 6, 7],
+      [
+        theme.colors.background,
+        theme.colors.joy + '40',     // Joy with transparency
+        theme.colors.sadness + '40', // Sadness with transparency
+        theme.colors.anger + '40',   // Anger with transparency
+        theme.colors.fear + '40',    // Fear with transparency
+        theme.colors.surprise + '40',// Surprise with transparency
+        theme.colors.contentment + '40', // Contentment with transparency
+        theme.colors.background,     // Neutral
+      ]
+    );
+    
+    return {
+      backgroundColor,
+    };
+  });
+  
+  const animatedTextStyle = useAnimatedStyle(() => {
+    return {
+      opacity: opacity.value,
+      transform: [{ translateY: translateY.value }],
+    };
+  });
+  
+  // Get emotion description based on dominant emotion
+  const getEmotionDescription = (): string => {
+    switch (dominantEmotion) {
+      case 'joy':
+        return "Your drawing reflects happiness and positivity. The strokes show energy and enthusiasm.";
+      case 'sadness':
+        return "Your drawing suggests feelings of melancholy. The strokes appear deliberate and thoughtful.";
+      case 'anger':
+        return "Your drawing indicates frustration or tension. The strokes are powerful and direct.";
+      case 'fear':
+        return "Your drawing suggests anxiety or concern. The strokes show hesitation and caution.";
+      case 'surprise':
+        return "Your drawing reflects wonder or astonishment. The strokes show spontaneity.";
+      case 'disgust':
+        return "Your drawing indicates aversion or displeasure. The strokes show intensity and restraint.";
+      case 'contentment':
+        return "Your drawing suggests peace and satisfaction. The strokes are balanced and harmonious.";
+      case 'neutral':
+      default:
+        return "Your drawing appears balanced and measured, without strong emotional indicators.";
     }
   };
   
-  const handleViewDiary = () => {
-    navigation.navigate('MoodDiary');
+  // Render emotion bars
+  const renderEmotionBars = () => {
+    const emotions = { ...emotionData };
+    const moodFactors = Object.entries(emotions)
+      .filter(([key]) => !['energy', 'calmness', 'tension'].includes(key))
+      .sort((a, b) => (b[1] as number) - (a[1] as number));
+    
+    return (
+      <View style={styles.emotionBarsContainer}>
+        {moodFactors.map(([emotion, value], index) => (
+          <Animated.View 
+            key={emotion}
+            style={[
+              styles.emotionBarRow,
+              { opacity: opacity.value },
+              useAnimatedStyle(() => ({
+                transform: [{ 
+                  translateX: withDelay(
+                    300 + index * 100, 
+                    withTiming(0, { duration: 500 })
+                  ) 
+                }]
+              }))
+            ]}
+          >
+            <Text style={styles.emotionLabel}>
+              {emotion.charAt(0).toUpperCase() + emotion.slice(1)}
+            </Text>
+            <View style={styles.barContainer}>
+              <Animated.View 
+                style={[
+                  styles.bar, 
+                  { 
+                    backgroundColor: getEmotionColor(emotion),
+                    width: `${(value as number) * 100}%` 
+                  },
+                  useAnimatedStyle(() => ({
+                    width: withDelay(
+                      300 + index * 100,
+                      withTiming(`${(value as number) * 100}%`, { duration: 1000 })
+                    )
+                  }))
+                ]}
+              />
+            </View>
+            <Text style={styles.emotionValue}>{Math.round((value as number) * 100)}%</Text>
+          </Animated.View>
+        ))}
+      </View>
+    );
   };
   
-  if (!moodAnalysis) {
-    return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Analyzing your emotions...</Text>
-      </SafeAreaView>
-    );
-  }
-  
   return (
-    <View style={styles.container}>
-      {/* Background visualization */}
-      {moodAnalysis && (
-        <EmotionAnimatedBackground 
-          emotion={moodAnalysis.emotions} 
-          dominantEmotion={moodAnalysis.dominantEmotion} 
-        />
-      )}
-      
-      <SafeAreaView style={styles.content}>
+    <SafeAreaView style={styles.safeArea}>
+      <Animated.View style={[styles.container, animatedBackgroundStyle]}>
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="arrow-back" size={24} color="#fff" />
+            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Your Mood Visualization</Text>
+          <Text style={styles.headerTitle}>Your Mood Analysis</Text>
         </View>
         
-        <View style={styles.infoContainer}>
-          <Text style={styles.emotionLabel}>
-            {moodAnalysis.dominantEmotion.toUpperCase()}
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+        >
+          <Animated.View style={[styles.visualizationContainer, animatedContainerStyle]}>
+            <View style={[styles.emotionCircle, { backgroundColor: getEmotionColor(dominantEmotion) }]}>
+              <Ionicons 
+                name={getEmotionIcon(dominantEmotion)} 
+                size={80} 
+                color="#fff" 
+              />
+            </View>
+          </Animated.View>
+          
+          <Animated.View style={animatedTextStyle}>
+            <Text style={styles.dominantEmotionText}>
+              {dominantEmotion.charAt(0).toUpperCase() + dominantEmotion.slice(1)}
           </Text>
           
-          <View style={styles.emotionBars}>
-            {Object.entries(moodAnalysis.emotions).map(([emotion, value]) => {
-              // Skip non-emotion properties
-              if (['energy', 'calmness', 'tension'].includes(emotion)) return null;
-              
-              return (
-                <View key={emotion} style={styles.emotionBarContainer}>
-                  <Text style={styles.emotionBarLabel}>{emotion}</Text>
-                  <View style={styles.emotionBarBackground}>
-                    <View
+            <Card style={styles.descriptionCard}>
+              <Text style={styles.descriptionText}>{getEmotionDescription()}</Text>
+            </Card>
+          </Animated.View>
+          
+          <View style={styles.gaugesContainer}>
+            <Animated.View 
+              style={useAnimatedStyle(() => ({
+                opacity: withDelay(500, withTiming(1, { duration: 500 })),
+                transform: [{ translateY: withDelay(500, withTiming(0, { duration: 500 })) }]
+              }))}
+            >
+              <Text style={styles.sectionTitle}>Emotion Intensity</Text>
+              {renderEmotionBars()}
+            </Animated.View>
+            
+            <View style={styles.moodFactorsContainer}>
+              <Animated.View 
+                style={useAnimatedStyle(() => ({
+                  opacity: withDelay(800, withTiming(1, { duration: 500 })),
+                  transform: [{ translateY: withDelay(800, withTiming(0, { duration: 500 })) }]
+                }))}
+              >
+                <Text style={styles.sectionTitle}>Mood Factors</Text>
+                
+                <View style={styles.moodFactorRow}>
+                  <View style={styles.moodFactor}>
+                    <Text style={styles.moodFactorLabel}>Energy</Text>
+                    <View style={styles.moodFactorBarContainer}>
+                      <Animated.View 
                       style={[
-                        styles.emotionBarFill,
-                        { width: `${value * 100}%`, backgroundColor: getEmotionColor(emotion) }
+                          styles.moodFactorBar,
+                          { backgroundColor: theme.colors.primary },
+                          useAnimatedStyle(() => ({
+                            width: withDelay(
+                              1000,
+                              withTiming(`${emotionData.energy}%`, { duration: 1000 })
+                            )
+                          }))
                       ]}
                     />
+                    </View>
+                    <Text style={styles.moodFactorValue}>{Math.round(emotionData.energy)}%</Text>
                   </View>
-                  <Text style={styles.emotionBarValue}>
-                    {Math.round(value * 100)}%
-                  </Text>
                 </View>
-              );
-            })}
+                
+                <View style={styles.moodFactorRow}>
+                  <View style={styles.moodFactor}>
+                    <Text style={styles.moodFactorLabel}>Calmness</Text>
+                    <View style={styles.moodFactorBarContainer}>
+                      <Animated.View 
+                        style={[
+                          styles.moodFactorBar,
+                          { backgroundColor: theme.colors.contentment },
+                          useAnimatedStyle(() => ({
+                            width: withDelay(
+                              1100,
+                              withTiming(`${emotionData.calmness}%`, { duration: 1000 })
+                            )
+                          }))
+                        ]} 
+                      />
+                    </View>
+                    <Text style={styles.moodFactorValue}>{Math.round(emotionData.calmness)}%</Text>
           </View>
         </View>
         
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity 
-            style={[styles.button, styles.saveButton]}
-            onPress={handleSave}
-            disabled={isSaving || saveComplete}
+                <View style={styles.moodFactorRow}>
+                  <View style={styles.moodFactor}>
+                    <Text style={styles.moodFactorLabel}>Tension</Text>
+                    <View style={styles.moodFactorBarContainer}>
+                      <Animated.View 
+                        style={[
+                          styles.moodFactorBar,
+                          { backgroundColor: theme.colors.anger },
+                          useAnimatedStyle(() => ({
+                            width: withDelay(
+                              1200,
+                              withTiming(`${emotionData.tension}%`, { duration: 1000 })
+                            )
+                          }))
+                        ]} 
+                      />
+                    </View>
+                    <Text style={styles.moodFactorValue}>{Math.round(emotionData.tension)}%</Text>
+                  </View>
+                </View>
+              </Animated.View>
+            </View>
+          </View>
+          
+          <Animated.View 
+            style={useAnimatedStyle(() => ({
+              opacity: withDelay(1500, withTiming(animationComplete ? 1 : 0, { duration: 500 })),
+              transform: [{ 
+                translateY: withDelay(
+                  1500, 
+                  withTiming(animationComplete ? 0 : 20, { duration: 500 })
+                ) 
+              }]
+            }))}
           >
-            <Text style={styles.buttonText}>
-              {saveComplete ? 'Saved!' : isSaving ? 'Saving...' : 'Save to Diary'}
-            </Text>
+            <View style={styles.actionsContainer}>
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={() => navigation.navigate('MoodDiary')}
+              >
+                <Text style={styles.actionButtonText}>View Mood History</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[styles.button, styles.diaryButton]}
-            onPress={handleViewDiary}
+                style={[styles.actionButton, styles.primaryButton]}
+                onPress={() => navigation.navigate('EmotionInput')}
           >
-            <Text style={styles.buttonText}>View Diary</Text>
+                <Text style={styles.primaryButtonText}>New Entry</Text>
           </TouchableOpacity>
         </View>
+          </Animated.View>
+        </ScrollView>
+      </Animated.View>
       </SafeAreaView>
-    </View>
   );
 };
 
-// Helper function to get a color for each emotion
+// Helper function to get color for emotion
 const getEmotionColor = (emotion: string): string => {
   const emotionColors: Record<string, string> = {
-    joy: '#FFD700',
-    sadness: '#4169E1',
-    anger: '#B22222',
-    fear: '#556B2F',
-    surprise: '#9932CC',
-    disgust: '#228B22',
-    contentment: '#4682B4',
-    neutral: '#A9A9A9',
+    joy: theme.colors.joy,
+    sadness: theme.colors.sadness,
+    anger: theme.colors.anger,
+    fear: theme.colors.fear,
+    surprise: theme.colors.surprise,
+    disgust: theme.colors.disgust,
+    contentment: theme.colors.contentment,
+    neutral: theme.colors.neutral,
   };
   
   return emotionColors[emotion] || theme.colors.primary;
 };
 
+// Helper function to get icon for emotion
+const getEmotionIcon = (emotion: string): string => {
+  const emotionIcons: Record<string, string> = {
+    joy: 'happy',
+    sadness: 'sad',
+    anger: 'flame',
+    fear: 'warning',
+    surprise: 'eye',
+    disgust: 'remove-circle',
+    contentment: 'heart',
+    neutral: 'remove',
+  };
+  
+  return emotionIcons[emotion] || 'help-circle';
+};
+
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     backgroundColor: theme.colors.background,
   },
-  loadingText: {
-    fontSize: theme.typography.fontSizes.lg,
-    color: theme.colors.text,
-  },
-  content: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+  container: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
   },
   backButton: {
     marginRight: theme.spacing.md,
   },
   headerTitle: {
     fontSize: theme.typography.fontSizes.lg,
-    fontWeight: '700',
-    color: '#fff',
+    fontWeight: theme.typography.fontWeights.bold,
+    color: theme.colors.text,
   },
-  infoContainer: {
+  scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: theme.spacing.xl,
+  },
+  visualizationContainer: {
+    alignItems: 'center',
     justifyContent: 'center',
-    padding: theme.spacing.lg,
+    paddingVertical: theme.spacing.xl,
   },
-  emotionLabel: {
-    fontSize: theme.typography.fontSizes.xxxl,
-    fontWeight: '700',
-    color: '#fff',
+  emotionCircle: {
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...theme.shadows.medium,
+  },
+  dominantEmotionText: {
+    fontSize: theme.typography.fontSizes.xxl,
+    fontWeight: theme.typography.fontWeights.bold,
+    color: theme.colors.text,
     textAlign: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  descriptionCard: {
+    marginHorizontal: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+  },
+  descriptionText: {
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.text,
+    lineHeight: 24,
+    textAlign: 'center',
+  },
+  gaugesContainer: {
+    marginTop: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+  },
+  sectionTitle: {
+    fontSize: theme.typography.fontSizes.lg,
+    fontWeight: theme.typography.fontWeights.bold,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.md,
+  },
+  emotionBarsContainer: {
     marginBottom: theme.spacing.xl,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 5,
   },
-  emotionBars: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 8,
-    padding: theme.spacing.md,
-  },
-  emotionBarContainer: {
+  emotionBarRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: theme.spacing.sm,
+    transform: [{ translateX: -50 }], // Initial position for animation
   },
-  emotionBarLabel: {
-    width: 80,
-    color: '#fff',
+  emotionLabel: {
+    width: 100,
     fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.text,
   },
-  emotionBarBackground: {
+  barContainer: {
     flex: 1,
-    height: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 4,
+    height: 10,
+    backgroundColor: theme.colors.lightGray,
+    borderRadius: 5,
     overflow: 'hidden',
+    marginHorizontal: theme.spacing.sm,
   },
-  emotionBarFill: {
+  bar: {
     height: '100%',
-    borderRadius: 4,
+    width: '0%', // Initial width for animation
+    borderRadius: 5,
   },
-  emotionBarValue: {
+  emotionValue: {
     width: 40,
-    textAlign: 'right',
-    color: '#fff',
     fontSize: theme.typography.fontSizes.sm,
-    marginLeft: theme.spacing.sm,
+    color: theme.colors.text,
+    textAlign: 'right',
   },
-  buttonContainer: {
+  moodFactorsContainer: {
+    marginBottom: theme.spacing.xl,
+    opacity: 0, // Initial opacity for animation
+    transform: [{ translateY: 20 }], // Initial position for animation
+  },
+  moodFactorRow: {
+    marginBottom: theme.spacing.md,
+  },
+  moodFactor: {
+    alignItems: 'center',
+  },
+  moodFactorLabel: {
+    fontSize: theme.typography.fontSizes.md,
+    fontWeight: theme.typography.fontWeights.medium,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+  },
+  moodFactorBarContainer: {
+    width: '100%',
+    height: 16,
+    backgroundColor: theme.colors.lightGray,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginVertical: theme.spacing.xs,
+  },
+  moodFactorBar: {
+    height: '100%',
+    width: '0%', // Initial width for animation
+  },
+  moodFactorValue: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textLight,
+  },
+  actionsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    padding: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.lg,
   },
-  button: {
+  actionButton: {
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
-    borderRadius: 8,
+    borderRadius: theme.radii.md,
+    backgroundColor: theme.colors.cardBackground,
+    ...theme.shadows.light,
     flex: 1,
     marginHorizontal: theme.spacing.sm,
     alignItems: 'center',
   },
-  saveButton: {
+  primaryButton: {
     backgroundColor: theme.colors.primary,
   },
-  diaryButton: {
-    backgroundColor: theme.colors.secondary,
-  },
-  buttonText: {
-    color: '#fff',
+  actionButtonText: {
+    color: theme.colors.text,
     fontSize: theme.typography.fontSizes.md,
-    fontWeight: '500',
+    fontWeight: theme.typography.fontWeights.medium,
+  },
+  primaryButtonText: {
+    color: theme.colors.white,
+    fontSize: theme.typography.fontSizes.md,
+    fontWeight: theme.typography.fontWeights.medium,
   },
 }); 

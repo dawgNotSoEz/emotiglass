@@ -1,10 +1,19 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, Text, Dimensions, TouchableOpacity, ScrollView } from 'react-native';
+import React from 'react';
+import { 
+  View, 
+  StyleSheet, 
+  Text, 
+  Dimensions, 
+  TouchableOpacity, 
+  ScrollView,
+  TextStyle
+} from 'react-native';
 import { LineChart, BarChart, PieChart, ProgressChart, ContributionGraph } from 'react-native-chart-kit';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, typography } from '../../constants/theme';
-import { TrendAnalysisResult, MoodTrend } from '../../services/trendAnalysis';
+import theme from '../../constants/theme';
+import { TrendAnalysisResult } from '../../services/trendAnalysis';
+import { Card } from './Card';
 
 interface MoodTrendChartsProps {
   trendData: TrendAnalysisResult;
@@ -16,14 +25,14 @@ export const MoodTrendCharts: React.FC<MoodTrendChartsProps> = ({
   days 
 }) => {
   const { width } = Dimensions.get('window');
-  const chartWidth = width - spacing.lg * 2;
+  const chartWidth = width - theme.spacing.lg * 2;
   
   // Chart types
   const chartTypes = ['line', 'pie', 'bar', 'radar', 'heatmap'] as const;
   type ChartType = typeof chartTypes[number];
   
   // Active chart state
-  const [activeChart, setActiveChart] = useState<ChartType>('line');
+  const [activeChart, setActiveChart] = React.useState<ChartType>('line');
   
   // Animation values for chart switching
   const chartOpacity = useSharedValue(1);
@@ -35,7 +44,7 @@ export const MoodTrendCharts: React.FC<MoodTrendChartsProps> = ({
     const today = new Date();
     
     // If we have fewer entries than days, adjust the number of labels
-    const numLabels = Math.min(days, trendData.trends.energy.data.length);
+    const numLabels = Math.min(days, trendData.moodFactorsTimeline.dates.length);
     
     for (let i = 0; i < numLabels; i++) {
       const date = new Date(today);
@@ -75,10 +84,10 @@ export const MoodTrendCharts: React.FC<MoodTrendChartsProps> = ({
       datasets: [
         {
           data: [
-            trendData.timeOfDay.morning,
-            trendData.timeOfDay.afternoon,
-            trendData.timeOfDay.evening,
-            trendData.timeOfDay.night,
+            trendData.inputMethodUsage.sliders || 0,
+            trendData.inputMethodUsage.drawing || 0,
+            trendData.inputMethodUsage.voice || 0,
+            trendData.inputMethodUsage.face || 0,
           ],
         },
       ],
@@ -90,14 +99,14 @@ export const MoodTrendCharts: React.FC<MoodTrendChartsProps> = ({
     // For ProgressChart, data needs to be between 0-1
     const data = {
       data: [
-        trendData.trends.energy.data.length > 0 
-          ? trendData.trends.energy.data[trendData.trends.energy.data.length - 1] / 100 
+        trendData.moodFactorsTimeline.energy.length > 0 
+          ? trendData.stats.averageEnergy / 100 
           : 0,
-        trendData.trends.calmness.data.length > 0 
-          ? trendData.trends.calmness.data[trendData.trends.calmness.data.length - 1] / 100 
+        trendData.moodFactorsTimeline.calmness.length > 0 
+          ? trendData.stats.averageCalmness / 100 
           : 0,
-        trendData.trends.tension.data.length > 0 
-          ? trendData.trends.tension.data[trendData.trends.tension.data.length - 1] / 100 
+        trendData.moodFactorsTimeline.tension.length > 0 
+          ? trendData.stats.averageTension / 100 
           : 0,
         // Get the latest values for the basic emotions (normalized to 0-1)
         Object.entries(trendData.emotionFrequency).find(([emotion]) => emotion === 'joy')?.[1] || 0,
@@ -183,299 +192,322 @@ export const MoodTrendCharts: React.FC<MoodTrendChartsProps> = ({
   const renderCurrentChart = () => {
     switch (activeChart) {
       case 'line':
-        return (
-          <>
-            <Text style={styles.chartTitle}>Emotion Parameters Over Time</Text>
-            <LineChart
-              data={{
-                labels: generateDateLabels(),
-                datasets: [
-                  {
-                    data: trendData.trends.energy.data.length > 0 
-                      ? trendData.trends.energy.data 
-                      : [0],
-                    color: () => trendData.trends.energy.color,
-                    strokeWidth: 2,
-                  },
-                  {
-                    data: trendData.trends.calmness.data.length > 0 
-                      ? trendData.trends.calmness.data 
-                      : [0],
-                    color: () => trendData.trends.calmness.color,
-                    strokeWidth: 2,
-                  },
-                  {
-                    data: trendData.trends.tension.data.length > 0 
-                      ? trendData.trends.tension.data 
-                      : [0],
-                    color: () => trendData.trends.tension.color,
-                    strokeWidth: 2,
-                  },
-                ],
-                legend: ['Energy', 'Calmness', 'Tension'],
-              }}
-              width={chartWidth}
-              height={220}
-              chartConfig={{
-                backgroundColor: '#fff',
-                backgroundGradientFrom: '#fff',
-                backgroundGradientTo: '#fff',
-                decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                style: {
-                  borderRadius: 16,
+        return [
+          React.createElement(Text, { key: 'title', style: styles.chartTitle as TextStyle }, 'Emotion Parameters Over Time'),
+          React.createElement(LineChart, {
+            key: 'chart',
+            data: {
+              labels: generateDateLabels(),
+              datasets: [
+                {
+                  data: trendData.moodFactorsTimeline.energy.length > 0 
+                    ? trendData.moodFactorsTimeline.energy 
+                    : [0],
+                  color: () => '#FFD700', // Energy color
+                  strokeWidth: 2,
                 },
-                propsForDots: {
-                  r: '4',
-                  strokeWidth: '1',
-                  stroke: '#fafafa',
+                {
+                  data: trendData.moodFactorsTimeline.calmness.length > 0 
+                    ? trendData.moodFactorsTimeline.calmness 
+                    : [0],
+                  color: () => '#4682B4', // Calmness color
+                  strokeWidth: 2,
                 },
-              }}
-              style={styles.chart}
-              bezier
-            />
-          </>
-        );
+                {
+                  data: trendData.moodFactorsTimeline.tension.length > 0 
+                    ? trendData.moodFactorsTimeline.tension 
+                    : [0],
+                  color: () => '#B22222', // Tension color
+                  strokeWidth: 2,
+                },
+              ],
+              legend: ['Energy', 'Calmness', 'Tension'],
+            },
+            width: chartWidth,
+            height: 220,
+            chartConfig: {
+              backgroundColor: '#fff',
+              backgroundGradientFrom: '#fff',
+              backgroundGradientTo: '#fff',
+              decimalPlaces: 0,
+              color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+              labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+              style: {
+                borderRadius: 16,
+              },
+              propsForDots: {
+                r: '4',
+                strokeWidth: '1',
+                stroke: '#fafafa',
+              },
+            },
+            style: styles.chart,
+            bezier: true
+          })
+        ];
         
       case 'pie':
-        return (
-          <>
-            <Text style={styles.chartTitle}>Emotion Distribution</Text>
-            <PieChart
-              data={prepareEmotionData()}
-              width={chartWidth}
-              height={220}
-              chartConfig={{
-                backgroundColor: '#fff',
-                backgroundGradientFrom: '#fff',
-                backgroundGradientTo: '#fff',
-                color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-              }}
-              accessor="count"
-              backgroundColor="transparent"
-              paddingLeft="15"
-              absolute
-            />
-          </>
-        );
+        return [
+          React.createElement(Text, { key: 'title', style: styles.chartTitle as TextStyle }, 'Emotion Distribution'),
+          React.createElement(PieChart, {
+            key: 'chart',
+            data: prepareEmotionData(),
+            width: chartWidth,
+            height: 220,
+            chartConfig: {
+              backgroundColor: '#fff',
+              backgroundGradientFrom: '#fff',
+              backgroundGradientTo: '#fff',
+              color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+            },
+            accessor: "count",
+            backgroundColor: "transparent",
+            paddingLeft: "15",
+            absolute: true
+          })
+        ];
         
       case 'bar':
-        return (
-          <>
-            <Text style={styles.chartTitle}>Time of Day Distribution</Text>
-            <BarChart
-              data={prepareTimeOfDayData()}
-              width={chartWidth}
-              height={220}
-              yAxisLabel=""
-              yAxisSuffix=""
-              chartConfig={{
-                backgroundColor: '#fff',
-                backgroundGradientFrom: '#fff',
-                backgroundGradientTo: '#fff',
-                decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(52, 152, 219, ${opacity})`,
-                labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                style: {
-                  borderRadius: 16,
-                },
-              }}
-              style={styles.chart}
-            />
-          </>
-        );
+        return [
+          React.createElement(Text, { key: 'title', style: styles.chartTitle as TextStyle }, 'Input Method Distribution'),
+          React.createElement(BarChart, {
+            key: 'chart',
+            data: prepareTimeOfDayData(),
+            width: chartWidth,
+            height: 220,
+            yAxisLabel: "",
+            yAxisSuffix: "",
+            chartConfig: {
+              backgroundColor: '#fff',
+              backgroundGradientFrom: '#fff',
+              backgroundGradientTo: '#fff',
+              decimalPlaces: 0,
+              color: (opacity = 1) => `rgba(52, 152, 219, ${opacity})`,
+              labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+              style: {
+                borderRadius: 16,
+              },
+            },
+            style: styles.chart
+          })
+        ];
         
       case 'radar':
-        return (
-          <>
-            <Text style={styles.chartTitle}>Current Emotional Profile</Text>
-            <ProgressChart
-              data={prepareRadarData()}
-              width={chartWidth}
-              height={220}
-              chartConfig={{
-                backgroundColor: '#fff',
-                backgroundGradientFrom: '#fff',
-                backgroundGradientTo: '#fff',
-                decimalPlaces: 2,
-                color: (opacity = 1) => `rgba(54, 162, 235, ${opacity})`,
-                labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                style: {
-                  borderRadius: 16,
-                },
-              }}
-              style={styles.chart}
-              strokeWidth={5}
-              radius={32}
-              hideLegend={false}
-            />
-          </>
-        );
+        return [
+          React.createElement(Text, { key: 'title', style: styles.chartTitle as TextStyle }, 'Current Emotional Profile'),
+          React.createElement(ProgressChart, {
+            key: 'chart',
+            data: prepareRadarData(),
+            width: chartWidth,
+            height: 220,
+            chartConfig: {
+              backgroundColor: '#fff',
+              backgroundGradientFrom: '#fff',
+              backgroundGradientTo: '#fff',
+              decimalPlaces: 2,
+              color: (opacity = 1) => `rgba(54, 162, 235, ${opacity})`,
+              labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+              style: {
+                borderRadius: 16,
+              },
+            },
+            style: styles.chart,
+            strokeWidth: 5,
+            radius: 32,
+            hideLegend: false
+          })
+        ];
         
       case 'heatmap':
-        return (
-          <>
-            <Text style={styles.chartTitle}>Mood Activity Calendar</Text>
-            <ContributionGraph
-              values={prepareMoodHeatmapData()}
-              endDate={new Date()}
-              numDays={90}
-              width={chartWidth}
-              height={220}
-              chartConfig={{
-                backgroundColor: '#fff',
-                backgroundGradientFrom: '#fff',
-                backgroundGradientTo: '#fff',
-                decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(54, 162, 235, ${opacity})`,
-                labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                style: {
-                  borderRadius: 16,
-                },
-              }}
-              style={styles.chart}
-              tooltipDataAttrs={(value) => ({
-                fill: 'rgba(0, 0, 0, 0.7)',
-                fontSize: 10,
-                fontWeight: 'bold',
-                // Add other valid SVG rect attributes as needed
-              })}
-            />
-          </>
-        );
+        return [
+          React.createElement(Text, { key: 'title', style: styles.chartTitle as TextStyle }, 'Mood Activity Calendar'),
+          React.createElement(ContributionGraph, {
+            key: 'chart',
+            values: prepareMoodHeatmapData(),
+            endDate: new Date(),
+            numDays: 90,
+            width: chartWidth,
+            height: 220,
+            chartConfig: {
+              backgroundColor: '#fff',
+              backgroundGradientFrom: '#fff',
+              backgroundGradientTo: '#fff',
+              decimalPlaces: 0,
+              color: (opacity = 1) => `rgba(54, 162, 235, ${opacity})`,
+              labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+              style: {
+                borderRadius: 16,
+              },
+            },
+            style: styles.chart,
+            tooltipDataAttrs: (value: any) => ({
+              fill: 'rgba(0, 0, 0, 0.7)',
+              fontSize: 10,
+              fontWeight: 'bold',
+            })
+          })
+        ];
         
       default:
         return null;
     }
   };
   
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Your Mood Trends</Text>
+  return React.createElement(
+    View, 
+    { style: styles.container },
+    [
+      React.createElement(Text, { key: 'title', style: styles.title as TextStyle }, 'Your Mood Trends'),
       
-      {/* Chart type selector */}
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chartTypesContainer}
-      >
-        {chartTypes.map((type) => (
-          <TouchableOpacity
-            key={type}
-            style={[
-              styles.chartTypeButton,
-              activeChart === type && styles.activeChartTypeButton
-            ]}
-            onPress={() => changeChartType(type)}
-          >
-            <Ionicons
-              name={
-                type === 'line' ? 'analytics' :
-                type === 'pie' ? 'pie-chart' :
-                type === 'bar' ? 'stats-chart' :
-                type === 'radar' ? 'radio' :
-                'calendar'
-              }
-              size={20}
-              color={activeChart === type ? '#fff' : colors.text}
-            />
-            <Text
-              style={[
-                styles.chartTypeText,
-                activeChart === type && styles.activeChartTypeText
-              ]}
-            >
-              {type.charAt(0).toUpperCase() + type.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      // Chart type selector
+      React.createElement(
+        ScrollView,
+        {
+          key: 'chart-selector',
+          horizontal: true,
+          showsHorizontalScrollIndicator: false,
+          contentContainerStyle: styles.chartTypesContainer
+        },
+        chartTypes.map((type) => 
+          React.createElement(
+            TouchableOpacity,
+            {
+              key: type,
+              style: [
+                styles.chartTypeButton,
+                activeChart === type && styles.activeChartTypeButton
+              ],
+              onPress: () => changeChartType(type)
+            },
+            [
+              React.createElement(
+                Ionicons,
+                {
+                  key: 'icon',
+                  name: type === 'line' ? 'analytics' :
+                        type === 'pie' ? 'pie-chart' :
+                        type === 'bar' ? 'stats-chart' :
+                        type === 'radar' ? 'radio' : 'calendar',
+                  size: 20,
+                  color: activeChart === type ? '#fff' : theme.colors.text
+                }
+              ),
+              React.createElement(
+                Text,
+                {
+                  key: 'text',
+                  style: [
+                    styles.chartTypeText,
+                    activeChart === type && styles.activeChartTypeText
+                  ]
+                },
+                type.charAt(0).toUpperCase() + type.slice(1)
+              )
+            ]
+          )
+        )
+      ),
       
-      {/* Current chart */}
-      <Animated.View style={[styles.chartContainer, animatedChartStyle]}>
-        {renderCurrentChart()}
-      </Animated.View>
+      // Current chart
+      React.createElement(
+        Animated.View,
+        {
+          key: 'chart-container',
+          style: [styles.chartContainer, animatedChartStyle]
+        },
+        renderCurrentChart()
+      ),
       
-      {/* Insights */}
-      <View style={styles.insightsContainer}>
-        <Text style={styles.sectionTitle}>Insights</Text>
-        {trendData.insights.map((insight, index) => (
-          <View 
-            key={index} 
-            style={[
-              styles.insightItem, 
-              { 
-                backgroundColor: insight.type === 'positive' 
-                  ? 'rgba(46, 204, 113, 0.1)' 
-                  : insight.type === 'negative' 
-                    ? 'rgba(231, 76, 60, 0.1)' 
-                    : 'rgba(52, 152, 219, 0.1)' 
-              }
-            ]}
-          >
-            <Ionicons 
-              name={
-                insight.type === 'positive' ? 'trending-up' :
-                insight.type === 'negative' ? 'trending-down' : 'information-circle'
-              }
-              size={20}
-              color={
-                insight.type === 'positive' ? '#2ecc71' :
-                insight.type === 'negative' ? '#e74c3c' : '#3498db'
-              }
-              style={styles.insightIcon}
-            />
-            <Text style={styles.insightText}>{insight.text}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
+      // Insights
+      React.createElement(
+        View,
+        { key: 'insights', style: styles.insightsContainer },
+        [
+          React.createElement(Text, { key: 'insights-title', style: styles.sectionTitle as TextStyle }, 'Insights'),
+          React.createElement(
+            View,
+            {
+              key: 'insight-item',
+              style: [
+                styles.insightItem,
+                {
+                  backgroundColor: 
+                    trendData.weeklySummary.changePercentage > 0 
+                      ? 'rgba(46, 204, 113, 0.1)' 
+                      : trendData.weeklySummary.changePercentage < 0 
+                        ? 'rgba(231, 76, 60, 0.1)' 
+                        : 'rgba(52, 152, 219, 0.1)'
+                }
+              ]
+            },
+            [
+              React.createElement(
+                Ionicons,
+                {
+                  key: 'insight-icon',
+                  name: trendData.weeklySummary.changePercentage > 0 ? 'trending-up' :
+                        trendData.weeklySummary.changePercentage < 0 ? 'trending-down' : 'information-circle',
+                  size: 20,
+                  color: trendData.weeklySummary.changePercentage > 0 ? '#2ecc71' :
+                         trendData.weeklySummary.changePercentage < 0 ? '#e74c3c' : '#3498db',
+                  style: styles.insightIcon
+                }
+              ),
+              React.createElement(
+                Text,
+                { key: 'insight-text', style: styles.insightText },
+                `This week's dominant emotion is ${trendData.weeklySummary.thisWeek.dominantEmotion} with ${trendData.weeklySummary.thisWeek.entriesCount} entries`
+              )
+            ]
+          )
+        ]
+      )
+    ]
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    padding: spacing.md,
+    padding: theme.spacing.md,
   },
   title: {
-    fontSize: typography.fontSizes.xl,
-    fontWeight: typography.fontWeights.bold,
-    color: colors.text,
-    marginBottom: spacing.lg,
+    fontSize: theme.typography.fontSizes.xl,
+    fontWeight: theme.typography.fontWeights.bold as '700',
+    color: theme.colors.text,
+    marginBottom: theme.spacing.lg,
     textAlign: 'center',
   },
   chartTypesContainer: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
   },
   chartTypeButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.cardBackground,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    backgroundColor: theme.colors.cardBackground,
     borderRadius: 16,
-    marginRight: spacing.sm,
+    marginRight: theme.spacing.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: theme.colors.border,
   },
   activeChartTypeButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: theme.colors.primary,
   },
   chartTypeText: {
-    color: colors.text,
-    fontSize: typography.fontSizes.sm,
-    marginLeft: spacing.xs,
+    color: theme.colors.text,
+    fontSize: theme.typography.fontSizes.sm,
+    marginLeft: theme.spacing.xs,
   },
   activeChartTypeText: {
     color: '#fff',
   },
   chartContainer: {
-    marginBottom: spacing.xl,
+    marginBottom: theme.spacing.xl,
     backgroundColor: '#fff',
-    padding: spacing.md,
+    padding: theme.spacing.md,
     borderRadius: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -484,37 +516,39 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   chartTitle: {
-    fontSize: typography.fontSizes.md,
-    fontWeight: typography.fontWeights.medium,
-    color: colors.text,
-    marginBottom: spacing.sm,
+    fontSize: theme.typography.fontSizes.md,
+    fontWeight: theme.typography.fontWeights.medium as '500',
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
   },
   sectionTitle: {
-    fontSize: typography.fontSizes.lg,
-    fontWeight: typography.fontWeights.bold,
-    color: colors.text,
-    marginBottom: spacing.md,
+    fontSize: theme.typography.fontSizes.lg,
+    fontWeight: theme.typography.fontWeights.bold as '700',
+    color: theme.colors.text,
+    marginBottom: theme.spacing.md,
   },
   chart: {
-    marginVertical: spacing.md,
+    marginVertical: theme.spacing.md,
     borderRadius: 8,
   },
   insightsContainer: {
-    marginBottom: spacing.xl,
+    marginBottom: theme.spacing.xl,
   },
   insightItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
+    padding: theme.spacing.md,
     borderRadius: 8,
-    marginBottom: spacing.sm,
+    marginBottom: theme.spacing.sm,
   },
   insightIcon: {
-    marginRight: spacing.sm,
+    marginRight: theme.spacing.sm,
   },
   insightText: {
     flex: 1,
-    fontSize: typography.fontSizes.md,
-    color: colors.text,
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.text,
   },
 }); 
+
+export default MoodTrendCharts; 

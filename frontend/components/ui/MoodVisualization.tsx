@@ -1,9 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
-import { Audio } from 'expo-av';
-import { EmotionAnalysisResult } from '../../types';
-import { SimpleEmotionParticles } from '../visualizations/SimpleEmotionParticles';
-import { EmotionWaves } from '../visualizations/EmotionWaves';
+import React, { useState, useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet,
+  TouchableOpacity,
+  Dimensions
+} from 'react-native';
+import theme from '../../constants/theme';
+
+// Dummy interface for mood analysis
+interface EmotionAnalysisResult {
+  dominantEmotion: string;
+  intensity: number;
+}
 
 interface MoodVisualizationProps {
   moodAnalysis: EmotionAnalysisResult;
@@ -25,65 +34,48 @@ const getEmotionBackgroundColor = (emotion: string): string => {
   return emotionColors[emotion] || '#F5F5F5';
 };
 
-// Helper function to get sound file
-const getEmotionSoundFile = (moodAnalysis: EmotionAnalysisResult) => {
-  // In a real app, you'd have different sound files for different emotions
-  // For now, we'll use a placeholder
-  try {
-    return require('../../assets/sounds/ambient.mp3');
-  } catch (error) {
-    console.error('Error loading sound file:', error);
-    return null;
-  }
+// Dummy function to replace sound import
+const getDummySound = () => {
+  console.log('Returning dummy sound');
+  return null;
 };
 
 export const MoodVisualization: React.FC<MoodVisualizationProps> = ({ moodAnalysis }) => {
   const { width, height } = Dimensions.get('window');
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [selectedSound, setSelectedSound] = useState<string | null>(null);
   
-  // Get colors based on the dominant emotion
-  const backgroundColor = getEmotionBackgroundColor(moodAnalysis.dominantEmotion);
-  
-  // Play ambient sound based on mood
-  useEffect(() => {
-    const loadAndPlaySound = async () => {
-      try {
-        // Get the appropriate sound file based on emotion
-        const soundFile = getEmotionSoundFile(moodAnalysis);
-        
-        // Load and play the sound
-        const { sound } = await Audio.Sound.createAsync(
-          soundFile,
-          { shouldPlay: true, isLooping: true, volume: 0.5 }
-        );
-        setSound(sound);
-      } catch (error) {
-        console.error('Error loading sound', error);
-      }
-    };
-    
-    loadAndPlaySound();
-    
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
-    };
-  }, [moodAnalysis.dominantEmotion]);
-  
+  const playDummySound = (soundName: string) => {
+    console.log(`Playing dummy sound: ${soundName}`);
+    setSelectedSound(soundName);
+  };
+
+  const stopDummySound = () => {
+    console.log('Stopping dummy sound');
+    setSelectedSound(null);
+  };
+
   return (
-    <View style={[styles.container, { width, height, backgroundColor }]}>
-      {/* Base layer */}
-      <View style={styles.background} />
-      
-      {/* Wave animations */}
-      <EmotionWaves moodAnalysis={moodAnalysis} />
-      
-      {/* Particle system */}
-      <SimpleEmotionParticles 
-        moodAnalysis={moodAnalysis} 
-        count={Math.round(30 + (moodAnalysis.intensity / 100) * 40)} 
-      />
+    <View style={[styles.container, { width, height }]}>
+      <Text style={styles.title}>Mood Visualization</Text>
+      <View style={styles.soundControls}>
+        <Text style={styles.currentSound}>
+          {selectedSound ? `Playing: ${selectedSound}` : 'No sound playing'}
+        </Text>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity 
+            style={styles.button}
+            onPress={() => playDummySound('Ambient')}
+          >
+            <Text style={styles.buttonText}>Play Ambient</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.button}
+            onPress={stopDummySound}
+          >
+            <Text style={styles.buttonText}>Stop</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </View>
   );
 };
@@ -93,13 +85,33 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden',
+    backgroundColor: theme.colors.background,
   },
-  background: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  title: {
+    fontSize: theme.typography.fontSizes.xl,
+    fontWeight: theme.typography.fontWeights.bold as '700',
+    marginBottom: theme.spacing.lg,
   },
-}); 
+  soundControls: {
+    alignItems: 'center',
+  },
+  currentSound: {
+    fontSize: theme.typography.fontSizes.md,
+    marginBottom: theme.spacing.md,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+  },
+  button: {
+    backgroundColor: theme.colors.primary,
+    padding: theme.spacing.md,
+    marginHorizontal: theme.spacing.sm,
+    borderRadius: theme.radii.md,
+  },
+  buttonText: {
+    color: theme.colors.text,
+    fontSize: theme.typography.fontSizes.md,
+  },
+});
+
+export default MoodVisualization; 

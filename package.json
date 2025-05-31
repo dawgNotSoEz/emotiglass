@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@react-navigation/bottom-tabs": "^7.3.14",
+    "expo-av": "^13.10.0",
+    "expo-camera": "^16.1.6",
+    "expo-face-detector": "^12.6.0",
+    "expo-file-system": "^18.1.10"
+  }
+}

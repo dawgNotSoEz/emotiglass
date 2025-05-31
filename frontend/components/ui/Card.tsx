@@ -2,21 +2,54 @@ import React from 'react';
 import { View, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import theme from '../../constants/theme';
 
-interface GlassCardProps {
+interface CardProps {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
+  elevation?: 'none' | 'low' | 'medium' | 'high';
   padding?: 'none' | 'small' | 'medium' | 'large';
   borderRadius?: 'none' | 'small' | 'medium' | 'large' | 'round';
 }
 
-export const GlassCard: React.FC<GlassCardProps> = ({
+/**
+ * A reusable card component with consistent styling
+ */
+export const Card: React.FC<CardProps> = ({
   children,
   style,
+  elevation = 'low',
   padding = 'medium',
   borderRadius = 'medium',
 }) => {
-  const paddingStyle = padding !== 'none' 
-    ? styles[`padding${padding.charAt(0).toUpperCase() + padding.slice(1)}` as keyof typeof styles] 
+  // Create shadow style based on elevation
+  let shadowStyle: ViewStyle = {};
+  if (elevation === 'low') {
+    shadowStyle = {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.18,
+      shadowRadius: 1.0,
+      elevation: 1,
+    };
+  } else if (elevation === 'medium') {
+    shadowStyle = {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+      elevation: 5,
+    };
+  } else if (elevation === 'high') {
+    shadowStyle = {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.32,
+      shadowRadius: 5.46,
+      elevation: 9,
+    };
+  }
+  
+  const paddingStyle = padding !== 'none'
+    ? styles[`padding${padding.charAt(0).toUpperCase() + padding.slice(1)}` as keyof typeof styles]
     : {};
   
   const borderRadiusStyle = borderRadius !== 'none'
@@ -24,10 +57,11 @@ export const GlassCard: React.FC<GlassCardProps> = ({
     : {};
 
   return React.createElement(
-    View,
+    View, 
     {
       style: [
         styles.card,
+        shadowStyle,
         paddingStyle,
         borderRadiusStyle,
         style,
@@ -39,9 +73,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: theme.colors.background,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.cardBackground,
     overflow: 'hidden',
   },
   // Padding styles
